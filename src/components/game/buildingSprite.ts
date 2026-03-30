@@ -613,10 +613,17 @@ export function calculateSpriteScale(
     scaleMultiplier *= activePack.abandonedScales[buildingType];
   }
   
+  // Apply level-based scale: higher level buildings appear taller
+  // Level 1 = 1.0x, Level 2 = 1.08x, Level 3 = 1.16x, Level 4 = 1.24x, Level 5 = 1.32x
+  if (building.level >= 2 && building.level <= 5 &&
+      variantType !== 'services' && variantType !== 'infrastructure') {
+    scaleMultiplier *= 1 + (building.level - 1) * 0.08;
+  }
+
   // Apply global scale from sprite pack
   const globalScale = activePack.globalScale ?? 1;
   scaleMultiplier *= globalScale;
-  
+
   return scaleMultiplier;
 }
 

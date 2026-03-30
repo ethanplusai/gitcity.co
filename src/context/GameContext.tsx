@@ -59,6 +59,7 @@ type GameContextValue = {
   // PERF: Ref to latest state for real-time access without React re-renders
   // Canvas should use this instead of state.grid for smooth updates
   latestStateRef: React.RefObject<GameState>;
+  updateGrid: (updater: (grid: GameState['grid']) => GameState['grid']) => void;
   setTool: (tool: Tool) => void;
   setSpeed: (speed: 0 | 1 | 2 | 3) => void;
   setTaxRate: (rate: number) => void;
@@ -876,6 +877,14 @@ export function GameProvider({ children, startFresh = false, initialState: injec
     [],
   );
 
+  const updateGrid = useCallback((updater: (grid: GameState['grid']) => GameState['grid']) => {
+    setState((prev) => {
+      const newGrid = updater(prev.grid);
+      if (newGrid === prev.grid) return prev;
+      return { ...prev, grid: newGrid };
+    });
+  }, []);
+
   const placeAtTile = useCallback((x: number, y: number, isRemote = false) => {
     // For multiplayer broadcast, we need to capture the tool synchronously
     // before React batches the setState. We read from the latest state ref.
@@ -1637,6 +1646,7 @@ export function GameProvider({ children, startFresh = false, initialState: injec
   const value: GameContextValue = {
     state,
     latestStateRef,
+    updateGrid,
     setTool,
     setSpeed,
     setTaxRate,

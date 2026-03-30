@@ -17,7 +17,7 @@ interface CityViewerProps {
 }
 
 export default function CityViewer({ repoName, fileCount, dirCount, buildingPositions, files, onExit }: CityViewerProps) {
-  const { state } = useGame();
+  const { state, updateGrid } = useGame();
   const [buildCount, setBuildCount] = useState(0);
   const [copied, setCopied] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<{ file: RepoFile | null; buildingType: string; x: number; y: number } | null>(null);
@@ -38,9 +38,10 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
     }
   }, [center]);
 
-  // Staggered build animation: construction → finished building
+  // Staggered build animation: construction -> finished building
   // Buildings start at constructionProgress: 0 (from city-generator), showing construction sprites.
-  // Each building is revealed one by one, then its constructionProgress animates 0 → 100.
+  // Each building is revealed one by one, then its constructionProgress animates 0 -> 100.
+  // All updates go through updateGrid to trigger proper React state changes.
   useEffect(() => {
     if (hasBuildAnimated.current) return;
     if (buildingPositions.size === 0) return;
@@ -55,20 +56,23 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
     const constructionTickInterval = 60; // ms between progress updates
     const progressPerTick = (100 / constructionDuration) * constructionTickInterval;
 
-    let revealed = 0;
-
-    // All buildings start hidden (empty) — save their real types
-    const savedBuildings = new Map<string, { type: string; level: number }>();
-    for (const [, pos] of entries) {
-      const tile = state.grid[pos.y]?.[pos.x];
-      if (tile && tile.building.type !== 'empty' && tile.building.type !== 'road' && tile.building.type !== 'water' && tile.building.type !== 'grass') {
-        savedBuildings.set(`${pos.x},${pos.y}`, { type: tile.building.type, level: tile.building.level });
-        tile.building = { ...tile.building, type: 'empty' as any, level: 0, constructionProgress: 0 };
+    // Save the real building data and hide all buildings via a single state update
+    const savedBuildings = new Map<string, { type: string; level: number; zone: string }>();
+    updateGrid((grid) => {
+      const newGrid = grid.map(row => row.map(tile => ({ ...tile })));
+      for (const [, pos] of entries) {
+        const tile = newGrid[pos.y]?.[pos.x];
+        if (tile && tile.building.type !== 'empty' && tile.building.type !== 'road' && tile.building.type !== 'water' && tile.building.type !== 'grass') {
+          savedBuildings.set(`${pos.x},${pos.y}`, { type: tile.building.type, level: tile.building.level, zone: tile.zone });
+          newGrid[pos.y][pos.x] = { ...tile, building: { ...tile.building, type: 'empty' as any, level: 0, constructionProgress: 0 }, zone: 'none' };
+        }
       }
-    }
+      return newGrid;
+    });
 
-    // Track buildings that are currently animating construction progress
-    const animating = new Set<string>();
+    let revealed = 0;
+    // Track progress per building for construction animation
+    const progressMap = new Map<string, number>();
     const timers: ReturnType<typeof setInterval>[] = [];
 
     // Progressively reveal buildings, then animate their construction
@@ -82,25 +86,41 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
       const key = `${pos.x},${pos.y}`;
       const saved = savedBuildings.get(key);
       if (saved) {
-        const tile = state.grid[pos.y]?.[pos.x];
-        if (tile) {
-          // Reveal the building with constructionProgress: 0 (shows construction sprite)
-          tile.building = { ...tile.building, type: saved.type as any, level: saved.level, constructionProgress: 0 };
+        // Reveal the building with constructionProgress: 0 (shows construction sprite)
+        progressMap.set(key, 0);
+        updateGrid((grid) => {
+          const newGrid = grid.map(row => [...row]);
+          const tile = newGrid[pos.y]?.[pos.x];
+          if (tile) {
+            newGrid[pos.y][pos.x] = {
+              ...tile,
+              zone: saved.zone as any,
+              building: { ...tile.building, type: saved.type as any, level: saved.level, constructionProgress: 0 },
+            };
+          }
+          return newGrid;
+        });
 
-          // Start animating constructionProgress 0 → 100
-          animating.add(key);
-          const constructionTimer = setInterval(() => {
-            const t = state.grid[pos.y]?.[pos.x];
-            if (!t) { clearInterval(constructionTimer); animating.delete(key); return; }
-            const newProgress = Math.min(100, (t.building.constructionProgress || 0) + progressPerTick);
-            t.building = { ...t.building, constructionProgress: newProgress };
-            if (newProgress >= 100) {
-              clearInterval(constructionTimer);
-              animating.delete(key);
-            }
-          }, constructionTickInterval);
-          timers.push(constructionTimer);
-        }
+        // Start animating constructionProgress 0 -> 100
+        const constructionTimer = setInterval(() => {
+          const currentProgress = progressMap.get(key) ?? 0;
+          const newProgress = Math.min(100, currentProgress + progressPerTick);
+          progressMap.set(key, newProgress);
+
+          updateGrid((grid) => {
+            const newGrid = grid.map(row => [...row]);
+            const t = newGrid[pos.y]?.[pos.x];
+            if (!t) return grid;
+            newGrid[pos.y][pos.x] = { ...t, building: { ...t.building, constructionProgress: newProgress } };
+            return newGrid;
+          });
+
+          if (newProgress >= 100) {
+            clearInterval(constructionTimer);
+            progressMap.delete(key);
+          }
+        }, constructionTickInterval);
+        timers.push(constructionTimer);
       }
 
       revealed++;
@@ -112,7 +132,7 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
     return () => {
       for (const timer of timers) clearInterval(timer);
     };
-  }, [buildingPositions, state.grid]);
+  }, [buildingPositions, updateGrid]);
 
   const handleScreenshot = useCallback(() => {
     const container = cityContainerRef.current;
