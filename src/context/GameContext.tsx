@@ -737,17 +737,20 @@ export function GameProvider({ children, startFresh = false, initialState: injec
   
   // Separate effect that actually performs saves on an interval
   useEffect(() => {
+    // Skip all localStorage saves when using injected state (gitcity read-only views)
+    if (injectedState) return;
+
     // Wait for initial load - just check once after a short delay
     const checkLoadedTimeout = setTimeout(() => {
       if (!hasLoadedRef.current) {
         return;
       }
-      
+
       // Clear any existing save interval
       if (saveIntervalRef.current) {
         clearInterval(saveIntervalRef.current);
       }
-      
+
       // Set up interval to save every 5 seconds
       // PERF: Save operation is broken into chunks internally to avoid blocking
       saveIntervalRef.current = setInterval(() => {
@@ -800,7 +803,7 @@ export function GameProvider({ children, startFresh = false, initialState: injec
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
 
-    if (state.speed > 0) {
+    if (state.speed > 0 && !injectedState) {
       // Check if running on mobile for performance optimization
       const isMobileDevice = typeof window !== 'undefined' && (
         window.innerWidth < 768 ||
@@ -838,7 +841,7 @@ export function GameProvider({ children, startFresh = false, initialState: injec
         clearInterval(timer);
       }
     };
-  }, [state.speed]);
+  }, [state.speed, injectedState]);
 
   const setTool = useCallback((tool: Tool) => {
     setState((prev) => ({ ...prev, selectedTool: tool, activePanel: 'none' }));

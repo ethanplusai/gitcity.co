@@ -73,6 +73,12 @@ function CityPageContent() {
         const repoData = await fetchRepoTree(parsed!.owner, parsed!.repo);
         if (cancelled) return;
 
+        if (repoData.files.length === 0) {
+          setError('This repository has no source files to visualize.');
+          setLoading(false);
+          return;
+        }
+
         setLoadingStage(`Analyzing ${repoData.files.length} files...`);
         // Small delay so the stage is visible
         await new Promise(r => setTimeout(r, 300));

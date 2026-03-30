@@ -105,6 +105,11 @@ export async function fetchRepoTree(owner: string, repo: string, branch = 'main'
     throw new Error('No tree data in response');
   }
 
+  if (data.truncated) {
+    console.warn(`GitHub API returned truncated tree for ${owner}/${repo}`);
+    // Continue with partial data — we cap at 500 files anyway
+  }
+
   const files: RepoFile[] = [];
   let totalSize = 0;
 

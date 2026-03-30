@@ -74,7 +74,7 @@ export default async function RootLayout({ children }: {children: React.ReactNod
         type="image/webp" />
 
       </head>
-      <body className="bg-background text-foreground antialiased font-sans overflow-hidden"><GTProvider>{children}<Analytics /></GTProvider></body>
+      <body className="bg-background text-foreground antialiased font-sans overflow-x-hidden"><GTProvider>{children}<Analytics /></GTProvider></body>
     </html>
   );
 }
