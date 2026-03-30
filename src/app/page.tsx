@@ -186,7 +186,7 @@ export default function HomePage() {
         {/* Footer */}
         <div className="text-center pt-6 space-y-2">
           <p className="text-xs text-white/20 font-light">
-            Started by{' '}
+            Created by{' '}
             <a href="https://ethanplus.ai" className="text-white/30 hover:text-white/50 transition-colors" target="_blank" rel="noopener noreferrer">
               Ethan
             </a>
