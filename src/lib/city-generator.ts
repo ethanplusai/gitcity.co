@@ -374,9 +374,10 @@ export function generateCityFromRepo(
   const maxTotalFiles = Math.floor(usableSize * usableSize * 0.6);
   const cappedFiles = files.slice(0, maxTotalFiles);
 
-  // Target block inner size: ~6-10 files per side
-  const targetBlockInner = 7;
-  const maxPerGroup = targetBlockInner * targetBlockInner; // ~49 files per group
+  // Target fewer, bigger blocks for denser cities
+  // Scale maxPerGroup with file count — more files = bigger blocks
+  const targetBlockInner = Math.max(7, Math.min(15, Math.ceil(Math.sqrt(cappedFiles.length / 4))));
+  const maxPerGroup = targetBlockInner * targetBlockInner;
 
   const groups = groupFiles(cappedFiles, maxPerGroup);
 
@@ -395,8 +396,8 @@ export function generateCityFromRepo(
   const usableEnd = gridSize - 3;
   const usableSpan = usableEnd - usableStart;
 
-  // Block size: divide usable area evenly
-  const blockSize = Math.max(4, Math.floor(usableSpan / blocksPerSide));
+  // Block size: divide usable area evenly — minimum block must fit the inner target
+  const blockSize = Math.max(targetBlockInner + 2, Math.floor(usableSpan / blocksPerSide));
 
   let entryIndex = 0;
 
