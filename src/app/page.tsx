@@ -7,13 +7,13 @@ import { parseRepoInput } from '@/lib/github-api';
 
 const EXAMPLE_REPOS = [
   { label: 'facebook/react', value: 'facebook/react', desc: 'The library for web UIs' },
-  { label: 'vercel/next.js', value: 'vercel/next.js', desc: 'The React framework' },
+  { label: 'sveltejs/svelte', value: 'sveltejs/svelte', desc: 'Cybernetically enhanced web apps' },
   { label: 'denoland/deno', value: 'denoland/deno', desc: 'A modern JS runtime' },
   { label: 'rust-lang/rust', value: 'rust-lang/rust', desc: 'The Rust compiler' },
-  { label: 'sveltejs/svelte', value: 'sveltejs/svelte', desc: 'Cybernetically enhanced web apps' },
   { label: 'golang/go', value: 'golang/go', desc: 'The Go programming language' },
   { label: 'microsoft/typescript', value: 'microsoft/typescript', desc: 'TypeScript language' },
-  { label: 'torvalds/linux', value: 'torvalds/linux', desc: 'The Linux kernel' },
+  { label: 'expressjs/express', value: 'expressjs/express', desc: 'Fast Node.js web framework' },
+  { label: 'tailwindlabs/tailwindcss', value: 'tailwindlabs/tailwindcss', desc: 'Utility-first CSS framework' },
 ];
 
 export default function HomePage() {
