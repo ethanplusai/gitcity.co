@@ -146,7 +146,8 @@ const FILE_TO_BUILDING: Record<string, BuildingType> = {
 };
 
 // Entry files get landmark buildings
-const ENTRY_BUILDINGS: BuildingType[] = ['city_hall', 'stadium', 'hospital', 'museum', 'airport'];
+// Only use single-tile buildings — multi-tile (airport, stadium, space_program, park_large) overflow into roads
+const ENTRY_BUILDINGS: BuildingType[] = ['city_hall', 'hospital', 'museum', 'university', 'fire_station'];
 
 // Default building for unknown file types
 const DEFAULT_BUILDING: BuildingType = 'house_small';
@@ -192,9 +193,9 @@ function createTile(x: number, y: number, buildingType: BuildingType = 'grass', 
 }
 
 function getBuildingForFile(file: RepoFile, entryIndex: number, isLargestFile: boolean): BuildingType {
-  // Largest file in the repo gets the space_program landmark
+  // Largest file in the repo gets a distinctive landmark (single-tile only)
   if (isLargestFile) {
-    return 'space_program';
+    return 'power_plant';
   }
 
   // File role-based assignments (checked before extension-based)
@@ -219,7 +220,7 @@ function getBuildingForFile(file: RepoFile, entryIndex: number, isLargestFile: b
   }
 
   if (isDocFile(file.path)) {
-    return 'park_large';
+    return 'park';
   }
 
   if (isPackageManager(file.path)) {
