@@ -804,7 +804,7 @@ export function GameProvider({ children, startFresh = false, initialState: injec
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
 
-    if (state.speed > 0 && !injectedState) {
+    if (state.speed > 0) {
       // Check if running on mobile for performance optimization
       const isMobileDevice = typeof window !== 'undefined' && (
         window.innerWidth < 768 ||

@@ -134,8 +134,8 @@ export async function fetchRepoTree(owner: string, repo: string, branch = 'main'
     totalSize += size;
   }
 
-  // Cap at 500 files for browser performance
-  const cappedFiles = files.length > 500 ? files.slice(0, 500) : files;
+  // Cap at 2000 files for browser performance
+  const cappedFiles = files.length > 2000 ? files.slice(0, 2000) : files;
   const result: RepoData = { owner, repo, files: cappedFiles, totalSize };
 
   // Cache in sessionStorage

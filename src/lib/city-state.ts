@@ -28,7 +28,7 @@ export function createCityGameState(grid: Tile[][], gridSize: number, cityName: 
     day: 1,
     hour: 12,
     tick: 0,
-    speed: 1, // keep at 1 for vehicle movement — simulation tick is skipped via GameProvider
+    speed: 1, // run at speed 1 for vehicle/pedestrian/aircraft animation
     selectedTool: 'select',
     taxRate: 0,
     effectiveTaxRate: 0,

@@ -369,8 +369,9 @@ export function generateCityFromRepo(
     grid.push(row);
   }
 
-  // Limit total files to what we can fit (cap at gridSize^2 * 0.5)
-  const maxTotalFiles = Math.floor(gridSize * gridSize * 0.5);
+  // Limit total files to what we can fit in the usable area
+  const usableSize = gridSize - 6; // minus water border
+  const maxTotalFiles = Math.floor(usableSize * usableSize * 0.6);
   const cappedFiles = files.slice(0, maxTotalFiles);
 
   // Target block inner size: ~6-10 files per side
@@ -392,10 +393,10 @@ export function generateCityFromRepo(
   // Reserve border for water (2 tiles) + margin (1 tile)
   const usableStart = 3;
   const usableEnd = gridSize - 3;
-  const usableSize = usableEnd - usableStart;
+  const usableSpan = usableEnd - usableStart;
 
   // Block size: divide usable area evenly
-  const blockSize = Math.max(4, Math.floor(usableSize / blocksPerSide));
+  const blockSize = Math.max(4, Math.floor(usableSpan / blocksPerSide));
 
   let entryIndex = 0;
 
@@ -488,11 +489,16 @@ export function generateCityFromRepo(
     }
   }
 
-  // Scatter trees on remaining grass in margins (85% density)
+  // Scatter trees on remaining grass — sparser in the city, denser at edges
   for (let y = 2; y < gridSize - 2; y++) {
     for (let x = 2; x < gridSize - 2; x++) {
-      if (grid[y][x].building.type === 'grass' && rand() > 0.15) {
-        grid[y][x] = createTile(x, y, 'tree');
+      if (grid[y][x].building.type === 'grass') {
+        const distFromEdge = Math.min(x - 2, y - 2, gridSize - 3 - x, gridSize - 3 - y);
+        // Dense trees near water edge, sparse near city center
+        const treeProbability = distFromEdge < 3 ? 0.7 : 0.3;
+        if (rand() < treeProbability) {
+          grid[y][x] = createTile(x, y, 'tree');
+        }
       }
     }
   }
@@ -504,18 +510,14 @@ export function generateCityFromRepo(
  * Calculate a good grid size for a repo based on file count.
  */
 export function calculateGridSize(fileCount: number): number {
-  // Small repos (under 50 files) get a compact grid
-  if (fileCount < 50) {
-    return 25;
-  }
-  // Each file needs ~2 tiles (building + road share), plus water border.
-  // Target ~40% building density in usable area.
-  // Usable area = (gridSize - 6)^2
-  // Buildings = fileCount, total tiles needed = fileCount / 0.4
-  // Cap files at 500 for performance — IsoCity renderer is expensive
-  const capped = Math.min(fileCount, 500);
-  const tilesNeeded = capped / 0.35;
-  const rawSize = Math.sqrt(tilesNeeded) + 6;
-  // Clamp between 30 and 60 — larger grids crash browsers
-  return Math.max(30, Math.min(60, Math.ceil(rawSize)));
+  // Target ~55% building density in usable area for a dense city feel
+  // Usable area = (gridSize - 6)^2 (minus water border)
+  // We want: fileCount / (usableArea) ≈ 0.55
+  // So: usableArea = fileCount / 0.55
+  // gridSize = sqrt(usableArea) + 6
+  const capped = Math.min(fileCount, 2000);
+  const usableArea = capped / 0.55;
+  const rawSize = Math.sqrt(usableArea) + 6;
+  // Clamp between 20 and 80
+  return Math.max(20, Math.min(80, Math.ceil(rawSize)));
 }
