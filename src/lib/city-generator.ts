@@ -95,10 +95,10 @@ const FILE_TO_BUILDING: Record<string, BuildingType> = {
   env: 'shop_small',
 
   // Styles — mansions (colorful)
-  css: 'mansion',
-  scss: 'mansion',
-  sass: 'mansion',
-  less: 'mansion',
+  css: 'house_medium',
+  scss: 'house_medium',
+  sass: 'house_medium',
+  less: 'house_medium',
 
   // HTML / templates
   html: 'house_medium',
