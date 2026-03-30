@@ -20,6 +20,7 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
   const { state, updateGrid } = useGame();
   const [buildCount, setBuildCount] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [cityReady, setCityReady] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<{ file: RepoFile | null; buildingType: string; x: number; y: number } | null>(null);
   const cityContainerRef = useRef<HTMLDivElement>(null);
   const center = Math.floor(state.gridSize / 2);
@@ -29,12 +30,16 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
   const [viewport, setViewport] = useState<{ offset: { x: number; y: number }; zoom: number; canvasSize: { width: number; height: number } } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  // Navigate to center first, then reveal the city after camera is in position
   useEffect(() => {
     if (!hasNavigated.current) {
       hasNavigated.current = true;
+      // Navigate to center immediately
+      setNavigationTarget({ x: center, y: center });
+      // Wait for camera animation to settle, then show city
       setTimeout(() => {
-        setNavigationTarget({ x: center, y: center });
-      }, 100);
+        setCityReady(true);
+      }, 800);
     }
   }, [center]);
 
@@ -45,6 +50,7 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
   useEffect(() => {
     if (hasBuildAnimated.current) return;
     if (buildingPositions.size === 0) return;
+    if (!cityReady) return; // Wait until camera is positioned
     hasBuildAnimated.current = true;
 
     const entries = [...buildingPositions.entries()];
@@ -132,7 +138,7 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
     return () => {
       for (const timer of timers) clearInterval(timer);
     };
-  }, [buildingPositions, updateGrid]);
+  }, [buildingPositions, updateGrid, cityReady]);
 
   const handleScreenshot = useCallback(() => {
     const container = cityContainerRef.current;
@@ -224,6 +230,17 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
 
         {/* Canvas */}
         <div ref={cityContainerRef} className="flex-1 relative overflow-hidden">
+          {/* Loading overlay — covers canvas until camera is centered */}
+          {!cityReady && (
+            <div className="absolute inset-0 z-30 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center transition-opacity duration-500">
+              <div className="text-center space-y-4">
+                <div className="text-white/60 text-lg font-light">Constructing {repoName}...</div>
+                <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden mx-auto">
+                  <div className="h-full bg-indigo-400/60 rounded-full animate-pulse" style={{ width: '80%' }} />
+                </div>
+              </div>
+            </div>
+          )}
           <CanvasIsometricGrid
             overlayMode="none"
             selectedTile={null}
