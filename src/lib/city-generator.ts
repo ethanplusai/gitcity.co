@@ -5,6 +5,54 @@
 import { Tile, Building, BuildingType } from '@/types/game';
 import { RepoFile } from './github-api';
 
+// ============================================================================
+// File Role Detection Helpers
+// ============================================================================
+
+function isTestFile(path: string): boolean {
+  return /\.(test|spec)\.[^.]+$/.test(path) ||
+    /\/__tests__\//.test(path) ||
+    /\/test\//.test(path) ||
+    /\/tests\//.test(path);
+}
+
+function isCIFile(path: string): boolean {
+  return path.startsWith('.github/') ||
+    path.includes('Jenkinsfile') ||
+    path.startsWith('.circleci/') ||
+    path.startsWith('.gitlab-ci');
+}
+
+function isLintConfig(path: string): boolean {
+  const name = path.split('/').pop() || '';
+  return /^\.?(eslint|prettier|editorconfig|stylelint)/.test(name);
+}
+
+function isInfraFile(path: string): boolean {
+  const name = path.split('/').pop() || '';
+  return /^(Dockerfile|docker-compose|\.dockerignore)/.test(name) ||
+    /\.(tf|hcl)$/.test(name) ||
+    path.includes('k8s/') || path.includes('kubernetes/');
+}
+
+function isPackageManager(path: string): boolean {
+  const name = path.split('/').pop() || '';
+  return ['package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml', 'Gemfile', 'pom.xml', 'build.gradle'].includes(name);
+}
+
+function isDocFile(path: string): boolean {
+  const name = path.split('/').pop() || '';
+  return /^(README|CONTRIBUTING|LICENSE|CHANGELOG|AUTHORS|CODE_OF_CONDUCT)/i.test(name);
+}
+
+function isEntryPoint(path: string): boolean {
+  const name = path.split('/').pop() || '';
+  return /^(index|main|app|entry)\.[^.]+$/.test(name);
+}
+
+// Test file building types — sports/recreation theme
+const TEST_BUILDINGS: BuildingType[] = ['park', 'tennis', 'playground_small', 'basketball_courts'];
+
 // Map file extensions to IsoCity building types
 const FILE_TO_BUILDING: Record<string, BuildingType> = {
   // TypeScript / JavaScript — commercial (offices)
@@ -103,7 +151,7 @@ const ENTRY_BUILDINGS: BuildingType[] = ['city_hall', 'stadium', 'hospital', 'mu
 // Default building for unknown file types
 const DEFAULT_BUILDING: BuildingType = 'house_small';
 
-function createBuilding(type: BuildingType, level: number = 1): Building {
+function createBuilding(type: BuildingType, level: number = 1, constructionProgress: number = 100): Building {
   return {
     type,
     level: type === 'grass' || type === 'empty' || type === 'water' || type === 'road' || type === 'tree' ? 0 : level,
@@ -114,7 +162,7 @@ function createBuilding(type: BuildingType, level: number = 1): Building {
     onFire: false,
     fireProgress: 0,
     age: 100,
-    constructionProgress: 100,
+    constructionProgress,
     abandoned: false,
   };
 }
@@ -123,18 +171,18 @@ function createBuilding(type: BuildingType, level: number = 1): Building {
 // Level 1 = tiny file, Level 5 = massive file (skyscraper)
 function getLevelFromLines(lines: number): number {
   if (lines >= 500) return 5;  // skyscraper
-  if (lines >= 200) return 4;  // tall
+  if (lines >= 300) return 4;  // tall
   if (lines >= 100) return 3;  // medium-tall
   if (lines >= 50) return 2;   // medium
   return 1;                     // small
 }
 
-function createTile(x: number, y: number, buildingType: BuildingType = 'grass', level: number = 1): Tile {
+function createTile(x: number, y: number, buildingType: BuildingType = 'grass', level: number = 1, constructionProgress: number = 100): Tile {
   return {
     x,
     y,
     zone: 'none',
-    building: createBuilding(buildingType, level),
+    building: createBuilding(buildingType, level, constructionProgress),
     landValue: 50,
     pollution: 0,
     crime: 0,
@@ -143,16 +191,70 @@ function createTile(x: number, y: number, buildingType: BuildingType = 'grass', 
   };
 }
 
-function getBuildingForFile(file: RepoFile, entryIndex: number): BuildingType {
+function getBuildingForFile(file: RepoFile, entryIndex: number, isLargestFile: boolean): BuildingType {
+  // Largest file in the repo gets the space_program landmark
+  if (isLargestFile) {
+    return 'space_program';
+  }
+
+  // File role-based assignments (checked before extension-based)
+  if (isTestFile(file.path)) {
+    // Deterministic pick from test building types
+    const hash = file.path.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+    return TEST_BUILDINGS[Math.abs(hash) % TEST_BUILDINGS.length];
+  }
+
+  if (isCIFile(file.path)) {
+    return 'fire_station';
+  }
+
+  if (isLintConfig(file.path)) {
+    return 'police_station';
+  }
+
+  if (isInfraFile(file.path)) {
+    // Deterministic pick between infrastructure building types
+    const hash = file.path.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+    return Math.abs(hash) % 2 === 0 ? 'power_plant' : 'water_tower';
+  }
+
+  if (isDocFile(file.path)) {
+    return 'park_large';
+  }
+
+  if (isPackageManager(file.path)) {
+    const hash = file.path.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+    return Math.abs(hash) % 2 === 0 ? 'subway_station' : 'rail_station';
+  }
+
+  // Entry point files get landmark buildings (only if flagged as entry)
   if (file.isEntry && entryIndex < ENTRY_BUILDINGS.length) {
     return ENTRY_BUILDINGS[entryIndex];
   }
 
+  // Non-flagged entry points also get landmarks
+  if (isEntryPoint(file.path)) {
+    return 'city_hall';
+  }
+
   const base = FILE_TO_BUILDING[file.type] || DEFAULT_BUILDING;
 
-  // Upgrade to taller variants for large files
-  if (file.lines >= 300) {
-    // Big files get tall commercial/residential variants
+  // Upgrade to taller/more dramatic variants for large files
+  if (file.lines >= 500) {
+    // Massive files — dense/tall variants
+    if (base === 'office_low') return 'office_high';
+    if (base === 'office_high') return 'mall';
+    if (base === 'shop_small') return 'office_high';
+    if (base === 'shop_medium') return 'office_high';
+    if (base === 'house_small') return 'apartment_high';
+    if (base === 'house_medium') return 'apartment_high';
+    if (base === 'factory_small') return 'factory_large';
+    if (base === 'factory_medium') return 'factory_large';
+    if (base === 'school') return 'university';
+    if (base === 'apartment_low') return 'apartment_high';
+    return base;
+  } else if (file.lines >= 300) {
+    // Big files — tall commercial/residential variants
     if (base === 'office_low') return 'office_high';
     if (base === 'shop_small') return 'shop_medium';
     if (base === 'shop_medium') return 'office_high';
@@ -161,10 +263,12 @@ function getBuildingForFile(file: RepoFile, entryIndex: number): BuildingType {
     if (base === 'factory_small') return 'factory_medium';
     if (base === 'factory_medium') return 'factory_large';
     if (base === 'school') return 'university';
+    return base;
   } else if (file.lines >= 150) {
     if (base === 'shop_small') return 'shop_medium';
     if (base === 'house_small') return 'house_medium';
     if (base === 'factory_small') return 'factory_medium';
+    return base;
   }
 
   return base;
@@ -250,6 +354,10 @@ export function generateCityFromRepo(
 ): { grid: Tile[][]; buildingPositions: Map<string, { x: number; y: number }> } {
   const rand = seededRandom(42);
   const buildingPositions = new Map<string, { x: number; y: number }>();
+
+  // Find the largest file by line count
+  const sortedBySize = [...files].sort((a, b) => b.lines - a.lines);
+  const largestFilePath = sortedBySize.length > 0 ? sortedBySize[0].path : null;
 
   // Initialize grid with grass
   const grid: Tile[][] = [];
@@ -343,25 +451,27 @@ export function generateCityFromRepo(
 
       if (fx >= gridSize || fy >= gridSize) return;
 
-      const buildingType = getBuildingForFile(file, entryIndex);
+      const isLargestFile = file.path === largestFilePath;
+      const buildingType = getBuildingForFile(file, entryIndex, isLargestFile);
       if (file.isEntry) entryIndex++;
       const level = getLevelFromLines(file.lines);
 
-      grid[fy][fx] = createTile(fx, fy, buildingType, level);
+      // Place buildings with constructionProgress: 0 for the build animation
+      grid[fy][fx] = createTile(fx, fy, buildingType, level, 0);
       const zone = ZONE_MAP[buildingType];
       if (zone) grid[fy][fx].zone = zone;
 
       buildingPositions.set(file.path, { x: fx, y: fy });
     });
 
-    // Fill remaining inner tiles with occasional trees
+    // Fill remaining inner tiles with trees (85% density for lush city feel)
     for (let iy = 0; iy < innerSize; iy++) {
       for (let ix = 0; ix < innerSize; ix++) {
         const fx = innerStartX + ix;
         const fy = innerStartY + iy;
         if (fx >= gridSize || fy >= gridSize) continue;
         if (grid[fy][fx].building.type !== 'grass') continue;
-        if (rand() > 0.5) {
+        if (rand() > 0.15) {
           grid[fy][fx] = createTile(fx, fy, 'tree');
         }
       }
@@ -378,10 +488,10 @@ export function generateCityFromRepo(
     }
   }
 
-  // Scatter trees on remaining grass in margins
+  // Scatter trees on remaining grass in margins (85% density)
   for (let y = 2; y < gridSize - 2; y++) {
     for (let x = 2; x < gridSize - 2; x++) {
-      if (grid[y][x].building.type === 'grass' && rand() > 0.65) {
+      if (grid[y][x].building.type === 'grass' && rand() > 0.15) {
         grid[y][x] = createTile(x, y, 'tree');
       }
     }

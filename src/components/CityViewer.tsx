@@ -38,7 +38,9 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
     }
   }, [center]);
 
-  // Staggered build animation: place buildings one by one
+  // Staggered build animation: construction → finished building
+  // Buildings start at constructionProgress: 0 (from city-generator), showing construction sprites.
+  // Each building is revealed one by one, then its constructionProgress animates 0 → 100.
   useEffect(() => {
     if (hasBuildAnimated.current) return;
     if (buildingPositions.size === 0) return;
@@ -46,42 +48,70 @@ export default function CityViewer({ repoName, fileCount, dirCount, buildingPosi
 
     const entries = [...buildingPositions.entries()];
     const totalBuildings = entries.length;
-    // Adaptive delay: cap total animation at ~3s, dramatic for small repos, fast for large
-    const delay = Math.max(15, Math.min(80, 3000 / totalBuildings));
-    let placed = 0;
+    // Adaptive stagger delay: cap total reveal at ~3s
+    const staggerDelay = Math.max(15, Math.min(80, 3000 / totalBuildings));
+    // Construction animation: ~1.5s per building (runs concurrently after reveal)
+    const constructionDuration = 1500;
+    const constructionTickInterval = 60; // ms between progress updates
+    const progressPerTick = (100 / constructionDuration) * constructionTickInterval;
 
-    // Save the current building types, then clear all building tiles to 'empty'
+    let revealed = 0;
+
+    // All buildings start hidden (empty) — save their real types
     const savedBuildings = new Map<string, { type: string; level: number }>();
     for (const [, pos] of entries) {
       const tile = state.grid[pos.y]?.[pos.x];
       if (tile && tile.building.type !== 'empty' && tile.building.type !== 'road' && tile.building.type !== 'water' && tile.building.type !== 'grass') {
         savedBuildings.set(`${pos.x},${pos.y}`, { type: tile.building.type, level: tile.building.level });
-        tile.building = { ...tile.building, type: 'empty' as any, level: 0 };
+        tile.building = { ...tile.building, type: 'empty' as any, level: 0, constructionProgress: 0 };
       }
     }
 
-    // Progressively reveal buildings
-    const interval = setInterval(() => {
-      if (placed >= totalBuildings) {
-        clearInterval(interval);
+    // Track buildings that are currently animating construction progress
+    const animating = new Set<string>();
+    const timers: ReturnType<typeof setInterval>[] = [];
+
+    // Progressively reveal buildings, then animate their construction
+    const revealInterval = setInterval(() => {
+      if (revealed >= totalBuildings) {
+        clearInterval(revealInterval);
         return;
       }
 
-      const [, pos] = entries[placed];
+      const [, pos] = entries[revealed];
       const key = `${pos.x},${pos.y}`;
       const saved = savedBuildings.get(key);
       if (saved) {
         const tile = state.grid[pos.y]?.[pos.x];
         if (tile) {
-          tile.building = { ...tile.building, type: saved.type as any, level: saved.level };
+          // Reveal the building with constructionProgress: 0 (shows construction sprite)
+          tile.building = { ...tile.building, type: saved.type as any, level: saved.level, constructionProgress: 0 };
+
+          // Start animating constructionProgress 0 → 100
+          animating.add(key);
+          const constructionTimer = setInterval(() => {
+            const t = state.grid[pos.y]?.[pos.x];
+            if (!t) { clearInterval(constructionTimer); animating.delete(key); return; }
+            const newProgress = Math.min(100, (t.building.constructionProgress || 0) + progressPerTick);
+            t.building = { ...t.building, constructionProgress: newProgress };
+            if (newProgress >= 100) {
+              clearInterval(constructionTimer);
+              animating.delete(key);
+            }
+          }, constructionTickInterval);
+          timers.push(constructionTimer);
         }
       }
 
-      placed++;
-      setBuildCount(placed);
-    }, delay);
+      revealed++;
+      setBuildCount(revealed);
+    }, staggerDelay);
 
-    return () => clearInterval(interval);
+    timers.push(revealInterval);
+
+    return () => {
+      for (const timer of timers) clearInterval(timer);
+    };
   }, [buildingPositions, state.grid]);
 
   const handleScreenshot = useCallback(() => {
