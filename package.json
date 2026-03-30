@@ -5,11 +5,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run compress-images && next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "crop-screenshots": "bash scripts/crop-screenshots.sh",
-    "compress-images": "node scripts/compress-images.mjs"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
