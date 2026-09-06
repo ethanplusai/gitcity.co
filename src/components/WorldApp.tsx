@@ -885,6 +885,12 @@ export default function WorldApp() {
           gitcity<span className="alpha">ALPHA</span>
         </button>
         <nav aria-label="Main navigation">
+          {player && (
+            <button onClick={() => navigate('/' + encodeURIComponent(player.login))}>
+              <MapPin size={15} />
+              Your city
+            </button>
+          )}
           <button className={isWorld ? 'nav-active' : ''} onClick={() => navigate('/')}>
             <Globe2 size={15} />
             Explore
@@ -1762,6 +1768,18 @@ export default function WorldApp() {
               </div>
               {player ? (
                 <>
+                  <button
+                    className="primary wide"
+                    onClick={() => navigate('/' + encodeURIComponent(player.login))}
+                  >
+                    <MapPin size={17} />
+                    Visit your city
+                    <ArrowRight size={16} />
+                  </button>
+                  <p className="coverage">
+                    Your public repositories form the neighborhoods of your city. Repositories
+                    that opt out are excluded.
+                  </p>
                   <div className="balance-grid">
                     <div>
                       <Sparkles size={19} />
@@ -1816,6 +1834,10 @@ export default function WorldApp() {
                   open when GitHub sign-in is configured for this deployment.
                 </div>
               )}
+              <p className="coverage">
+                Gitcity displays public repositories only. Private repositories never appear on
+                the platform, and signing in does not give Gitcity access to them.
+              </p>
               <div className="passport-rule">
                 <ShieldCheck size={17} />
                 <span>Structure is earned. Presentation is yours.</span>

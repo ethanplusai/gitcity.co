@@ -4,6 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL('https://gitcity.co'),
   title: 'Gitcity — an open world, built by you.',
+  icons: { icon: { url: '/favicon.svg', type: 'image/svg+xml' } },
   description:
     'Explore GitHub as a living 3D landscape. Every repository a city. Every contribution leaves a mark.',
 };
