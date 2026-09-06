@@ -3,6 +3,7 @@ import FieldNotebook from './FieldNotebook';
 import VerifyContribution from './VerifyContribution';
 import { mergeSourceFiles } from '../../shared/source-pages.mjs';
 import { reconcileSourceFiles } from '../../shared/source-reconcile.mjs';
+import { progressiveCities } from '../../shared/progressive-cities.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -245,33 +246,6 @@ export default function WorldApp() {
         );
         setReady(true);
         setPhase('Open world · public repositories');
-        const landingRevision = engine.current?.navigationRevision;
-        fetch('/api/atlas')
-          .then((r) => (r.ok ? r.json() : []))
-          .then(async (data: Repo[]) => {
-            if (!cancelled) {
-              await engine.current?.previewBatch(
-                data.filter((repo) => repo.id === 'vercel/next.js'),
-              );
-              if (cancelled) return;
-              if (data.some((d) => d.cached))
-                setPhase('Verified source snapshots · live GitHub API temporarily unavailable');
-              if (!data.length) setPhase('GitHub is unavailable · search to explore a repository');
-              void engine.current
-                ?.previewBatch(data.filter((repo) => repo.id !== 'vercel/next.js'))
-                .catch(() => {});
-              landingReady.current = true;
-              if (routeRef.current === '/') {
-                if (engine.current?.navigationRevision === landingRevision)
-                  engine.current?.worldView();
-                setArriving(false);
-              }
-            }
-          })
-          .catch(() => {
-            landingReady.current = true;
-            if (routeRef.current === '/') setArriving(false);
-          });
       } catch {
         setWebglError(
           'This device could not start WebGL 2. You can still search repositories and browse their files below.',
@@ -330,8 +304,37 @@ export default function WorldApp() {
       repoRef.current = null;
       engine.current?.worldView();
       setPhase('Open world · Next.js city');
-      if (landingReady.current) setArriving(false);
-      return;
+      if (landingReady.current) {
+        setArriving(false);
+        return;
+      }
+      // Shared links spend their network and rendering budget on the destination.
+      // Only a visit to the homepage constructs the featured atlas cities.
+      api<Repo[]>('/api/atlas', { signal: controller.signal })
+        .then(async (data) => {
+          await engine.current?.previewBatch(
+            data.filter((repo) => repo.id === 'vercel/next.js'),
+            controller.signal,
+          );
+          if (controller.signal.aborted) return;
+          landingReady.current = true;
+          if (engine.current?.navigationRevision === arrivalRevision) engine.current?.worldView();
+          setArriving(false);
+          if (!data.length) setPhase('GitHub is unavailable · search to explore a repository');
+          void engine.current
+            ?.previewBatch(
+              data.filter((repo) => repo.id !== 'vercel/next.js'),
+              controller.signal,
+            )
+            .catch(() => {});
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) {
+            setArriving(false);
+            setError(error.message);
+          }
+        });
+      return () => controller.abort();
     }
     if (r.level === 'owner') {
       setRepo(null);
@@ -349,26 +352,34 @@ export default function WorldApp() {
             false,
             engine.current?.navigationRevision !== arrivalRevision,
           );
-          setArriving(false);
-          void Promise.allSettled(
-            cities
-              .slice(0, 4)
-              .map((city) => api<Repo>(`/api/repos/${city.id}`, { signal: controller.signal })),
-          )
-            .then(async (results) => {
-              if (!controller.signal.aborted) {
-                await engine.current?.previewBatch(
-                  results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : [])),
-                  controller.signal,
-                );
-                if (controller.signal.aborted) return;
-                // Detail replaces survey plots without reframing the visitor’s camera.
-              }
-            })
-            .catch((error) => {
-              if (!controller.signal.aborted) setError(error.message);
-            });
-          setPhase(`${cities.length} public districts · complete directory`);
+          setPhase(`Constructing neighborhoods · 0 of ${cities.length}`);
+          void progressiveCities(cities, {
+            signal: controller.signal,
+            load: (city: City) => api<Repo>(`/api/repos/${city.id}`, { signal: controller.signal }),
+            publish: (data: Repo) => engine.current?.previewBatch([data], controller.signal),
+            progress: (completed: number, total: number, failed: number) =>
+              setPhase(
+                `Constructing neighborhoods · ${completed - failed} of ${total}${failed ? ` · ${failed} unavailable` : ''}`,
+              ),
+          }).then((failures) => {
+            if (controller.signal.aborted) return;
+            setArriving(false);
+            const removed = new Set(
+              failures
+                .filter(({ error }) => [404, 410].includes(error.status))
+                .map(({ city }) => city.id),
+            );
+            for (const id of removed) engine.current?.removeCity(id);
+            if (removed.size)
+              setOwnerCities((previous) => previous.filter((city) => !removed.has(city.id)));
+            setPhase(
+              `${cities.length - failures.length} neighborhoods built${failures.length ? ` · ${failures.length} unavailable` : ''}`,
+            );
+            if (failures.length)
+              setError(
+                `${failures[0].city.id}${failures.length > 1 ? ` and ${failures.length - 1} other neighborhoods` : ''} could not be constructed. ${failures[0].error.message}`,
+              );
+          });
         })
         .catch((e) => {
           if (!controller.signal.aborted) {
@@ -1070,7 +1081,7 @@ export default function WorldApp() {
               available.
             </p>
           )}
-          {error ? (
+          {error && (
             <div className="error-panel" role="alert">
               {error}
               <button
@@ -1083,7 +1094,8 @@ export default function WorldApp() {
                 <ArrowRight size={14} />
               </button>
             </div>
-          ) : isOwner ? (
+          )}
+          {isOwner ? (
             <div className="owner-list">
               {ownerCities.map((c) => (
                 <button key={c.id} onClick={() => navigate('/' + c.id)}>
@@ -1096,7 +1108,7 @@ export default function WorldApp() {
                 </button>
               ))}
             </div>
-          ) : repo ? (
+          ) : !error && repo ? (
             <>
               <div className="repo-stats">
                 <div>
@@ -1777,8 +1789,8 @@ export default function WorldApp() {
                     <ArrowRight size={16} />
                   </button>
                   <p className="coverage">
-                    Your public repositories form the neighborhoods of your city. Repositories
-                    that opt out are excluded.
+                    Your public repositories form the neighborhoods of your city. Repositories that
+                    opt out are excluded.
                   </p>
                   <div className="balance-grid">
                     <div>
@@ -1835,8 +1847,8 @@ export default function WorldApp() {
                 </div>
               )}
               <p className="coverage">
-                Gitcity displays public repositories only. Private repositories never appear on
-                the platform, and signing in does not give Gitcity access to them.
+                Gitcity displays public repositories only. Private repositories never appear on the
+                platform, and signing in does not give Gitcity access to them.
               </p>
               <div className="passport-rule">
                 <ShieldCheck size={17} />

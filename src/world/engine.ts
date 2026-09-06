@@ -521,7 +521,13 @@ export class WorldEngine {
     this.renderer.domElement.dataset.terrainBlocks = String(this.landscape.blocks.length);
   }
   addCity(city: City, refresh = true) {
-    if (this.cities.has(city.id)) return;
+    const existing = this.cities.get(city.id);
+    if (existing) {
+      Object.assign(existing.city, city);
+      existing.group.position.set(city.x, 0, city.z);
+      if (refresh) this.clearCityTrees();
+      return;
+    }
     const group = new T.Group();
     group.position.set(city.x, 0, city.z);
     group.add(arrivalGrid(city.id));
@@ -1170,6 +1176,8 @@ export class WorldEngine {
     this.active = id;
     this.walking = false;
     this.fly(new T.Vector3(c.x + 27, 27, c.z + 34), new T.Vector3(c.x, 0, c.z));
+    // Begin at the destination's foundations, not halfway across empty terrain.
+    this.finishArrival();
     return c;
   }
   clearDistrict() {
@@ -1229,6 +1237,25 @@ export class WorldEngine {
     this.active = data.id;
     const located = this.cities.get(data.id);
     if (located && data.coordinates) {
+      // A cold link begins at a seeded address. Keep any visitor camera movement
+      // relative to the district when its permanent server address arrives.
+      const relocation = new T.Vector3(
+        data.coordinates.x - located.city.x,
+        0,
+        data.coordinates.z - located.city.z,
+      );
+      if (!arrival) {
+        this.camera.position.add(relocation);
+        this.controls.target.add(relocation);
+      }
+      if (preserveCamera && !arrival) {
+        savedPosition.add(relocation);
+        savedTarget.add(relocation);
+        if (savedGoal) {
+          savedGoal.position.add(relocation);
+          savedGoal.target.add(relocation);
+        }
+      }
       located.city.x = data.coordinates.x;
       located.city.z = data.coordinates.z;
       located.group.position.set(located.city.x, 0, located.city.z);
@@ -2800,7 +2827,8 @@ export class WorldEngine {
     );
     for (const [id, el] of orderedLabels) {
       const city = this.cities.get(id)!.city;
-      const survey = Boolean(this.cities.get(id)?.group.getObjectByName('arrival-grid'));
+      const survey =
+        this.data?.id !== id && Boolean(this.cities.get(id)?.group.getObjectByName('arrival-grid'));
       el.classList.toggle('survey-label', survey);
       const worldLabel = this.viewMode === 'world' && this.camera.position.y > 120;
       const title = worldLabel ? id.split('/')[0] : city.name;
