@@ -36,7 +36,7 @@ Current sessions and one-time OAuth states live in server memory. Use one server
 
 ## Vercel deployment
 
-The Node API is exposed through `src/pages/api/[[...path]].ts`; `/auth/*` rewrites to it. Production requires `DATABASE_URL`, a migrated database, `SESSION_ENCRYPTION_KEY`, and the canonical HTTPS `APP_ORIGIN`, in addition to the existing GitHub variables. Sessions and OAuth states are encrypted in the database; OAuth state is consumed once, atomically. See [production-deployment.md](production-deployment.md).
+The Node API is exposed through `src/pages/api/[[...endpoint]].ts`; `/auth/*` rewrites to it. Production requires `DATABASE_URL`, a migrated database, `SESSION_ENCRYPTION_KEY`, and the canonical HTTPS `APP_ORIGIN`, in addition to the existing GitHub variables. Sessions and OAuth states are encrypted in the database; OAuth state is consumed once, atomically. See [production-deployment.md](production-deployment.md).
 
 Use separate preview and production databases and OAuth callbacks. A local two-instance test verifies the protocol with mocked GitHub responses; a real browser sign-in on the configured deployment remains a release check.
 
