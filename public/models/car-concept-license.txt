@@ -1,0 +1,13 @@
+City touring car — attribution and modification notice
+
+Derived from Car Concept, by Eric Chadwick (2024), Darmstadt Graphics Group GmbH.
+Source: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept
+Source metadata: https://github.com/KhronosGroup/glTF-Sample-Assets/blob/main/Models/CarConcept/metadata.json
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+Legal text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Changes for Gitcity: removed textures and trademark-bearing artwork, omitted interior/engine components, welded and simplified geometry while preserving surface normals, baked a restrained vertex-color palette, normalized scale and orientation, and combined the visible parts into one material batch.
+No endorsement by the original creators or Khronos is implied.
+
+The source model's trademark/logo permissions are separate from CC BY 4.0. The derivative includes no source image textures, including Khronos and 3D Commerce logo images.

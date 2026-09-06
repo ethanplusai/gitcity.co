@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS players(login TEXT PRIMARY KEY,soft INTEGER DEFAULT 0,hard INTEGER DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY,login TEXT,amount INTEGER,repo TEXT);
+    CREATE TABLE IF NOT EXISTS cities(id TEXT PRIMARY KEY,x DOUBLE PRECISION,z DOUBLE PRECISION);
+    CREATE TABLE IF NOT EXISTS owner_cities(id TEXT PRIMARY KEY,x DOUBLE PRECISION,z DOUBLE PRECISION);
+    CREATE TABLE IF NOT EXISTS neighborhoods(id TEXT PRIMARY KEY,owner TEXT,slot INTEGER,x DOUBLE PRECISION,z DOUBLE PRECISION,UNIQUE(owner,slot));
+    CREATE TABLE IF NOT EXISTS land_claims(owner TEXT,column_index INTEGER,row_index INTEGER,repo TEXT,block_index INTEGER,version INTEGER,PRIMARY KEY(owner,column_index,row_index),UNIQUE(repo,block_index));
+    CREATE TABLE IF NOT EXISTS source_addresses(repo TEXT,path TEXT,slot INTEGER,PRIMARY KEY(repo,path),UNIQUE(repo,slot));
+    CREATE TABLE IF NOT EXISTS directory_addresses(repo TEXT,path TEXT,directory TEXT,slot INTEGER,PRIMARY KEY(repo,path),UNIQUE(repo,directory,slot));
+    CREATE TABLE IF NOT EXISTS directory_regions(repo TEXT,directory TEXT,ordinal INTEGER,PRIMARY KEY(repo,directory),UNIQUE(repo,ordinal));
+    CREATE TABLE IF NOT EXISTS directory_land(owner TEXT,repo TEXT,directory TEXT,chunk INTEGER,column_index INTEGER,row_index INTEGER,PRIMARY KEY(repo,directory,chunk),UNIQUE(owner,column_index,row_index));
+    CREATE TABLE IF NOT EXISTS directory_legacy(repo TEXT,path TEXT,slot INTEGER,PRIMARY KEY(repo,path));
+    CREATE TABLE IF NOT EXISTS possessions(login TEXT,repo TEXT,item TEXT,PRIMARY KEY(login,repo,item));
+    CREATE TABLE IF NOT EXISTS ownership(login TEXT,repo TEXT,path TEXT,pr INTEGER,PRIMARY KEY(login,repo,path));
+    CREATE TABLE IF NOT EXISTS treasury(repo TEXT PRIMARY KEY,balance INTEGER DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS ownership_repo ON ownership(repo);

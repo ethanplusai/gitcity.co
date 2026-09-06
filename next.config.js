@@ -1,9 +1,9 @@
-const { withGTConfig } = require("gt-next/config");
-
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+module.exports = {
   reactStrictMode: true,
-  reactCompiler: true,
+  devIndicators: false,
+  serverExternalPackages: ['pg'],
+  async rewrites() {
+    return { beforeFiles: [{ source: '/auth/:path*', destination: '/api/auth/:path*' }] };
+  },
 };
-
-module.exports = withGTConfig(nextConfig);

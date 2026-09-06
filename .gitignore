@@ -35,3 +35,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+data/
+.next/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.env*
+
+# Agent tooling installed by hosting integrations
+/.agents/
+/skills-lock.json

@@ -1,0 +1,12 @@
+.git
+node_modules
+.next
+.vercel
+.env
+.env.*
+data
+.agents
+.codex
+skills-lock.json
+playwright-report
+test-results

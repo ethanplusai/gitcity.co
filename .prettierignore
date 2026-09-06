@@ -1,0 +1,5 @@
+node_modules
+.next
+server/atlas.json
+package-lock.json
+public

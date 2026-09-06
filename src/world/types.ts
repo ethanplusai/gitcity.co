@@ -1,0 +1,104 @@
+export type City = {
+  cached?: boolean;
+  city?: { owner: string; x: number; z: number };
+  id: string;
+  name: string;
+  language: string | null;
+  color: string;
+  x: number;
+  z: number;
+  tagline?: string;
+  topic?: string;
+  footprint?: number;
+};
+export type CodeFile = {
+  directoryAddress?: number;
+  directoryLocated?: boolean;
+  address?: number;
+  path: string;
+  sha?: string;
+  symbols?: number;
+  complexity?: number;
+  lines?: number;
+  analysis: string;
+  lastCommit?: string;
+  contributor?: string;
+  imports?: string[];
+};
+export type LandPlan = {
+  version: number;
+  city: { x: number; z: number };
+  anchor: { x: number; z: number };
+  blocks: {
+    block: number;
+    column: number;
+    row: number;
+    polygon: { x: number; z: number }[];
+    center: { x: number; z: number };
+    width: number;
+    depth: number;
+  }[];
+};
+export type Repo = {
+  sourceInventory?: {
+    version: number;
+    ref: string | null;
+    complete: boolean;
+    directories: {
+      name: string;
+      address: number;
+      count: number;
+      capacity: number;
+      blocks: {
+        index: number;
+        column?: number;
+        row?: number;
+        mask?: string;
+        legacyMask?: string;
+        count: number;
+        parsed: number;
+        symbols: number;
+        complexity: number;
+      }[];
+    }[];
+  };
+  landPlan?: LandPlan;
+  cached?: boolean;
+  city?: { owner: string; x: number; z: number };
+  usage?: { kind: string; package: string; weekly: number; end: string } | null;
+  id: string;
+  name: string;
+  description: string;
+  language: string;
+  stars: number | null;
+  forks: number;
+  openPRs: number | null;
+  prsSampled: boolean;
+  ci: string;
+  files: CodeFile[];
+  totalFiles: number;
+  truncated: boolean;
+  directories: { name: string; count: number }[];
+  commits: { sha: string; message: string; date: string; author: string }[];
+  dependencies: { name: string; repo: string | null }[];
+  issuesAvailable?: boolean;
+  issues: {
+    number: number;
+    title: string;
+    url: string;
+    labels?: string[];
+    body?: string;
+    updatedAt?: string;
+  }[];
+  fetchedAt: string;
+  defaultBranch: string;
+  ref?: string;
+  historyCoverage: string;
+  timezone: number | null;
+  timezoneSamples?: number;
+  residents?: { login: string; path: string; pr: number }[];
+  civic?: { login: string; item: string }[];
+  treasury?: number;
+  codeowners: string;
+  coordinates: { x: number; z: number };
+};

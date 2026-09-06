@@ -1,37 +1,32 @@
-# gitcity v2
+# Gitcity
 
 ## Commands
-- `npm run dev` — start dev server
-- `npm run build` — production build
-- `npm run preview` — preview production build
+- `npm run dev` — custom Node/Express + Next development server on port 3000
+- `npm run build` — production Next build and TypeScript check
+- `npm start` — production custom server; requires the build and Node 24+
+- `npm test` — core invariants and SQLite ledger tests
+- `npm run lint` — application/server lint
+- `npm run test:browser` — Chrome browser suite against localhost:3000 with API fixtures
+- `npm run refresh:atlas` — fetch a verified, public source-metric atlas cache
+- `npm run format` — format application code
 
 ## Architecture
-- Forked from IsoCity (amilich/isometric-city, MIT)
-- Next.js + React + TypeScript + Canvas 2D
-- IsoCity's rendering engine: multi-canvas layered rendering, sprite sheets, procedural roads, vehicle systems
-- Data source: GitHub API (replaces IsoCity's user-placed buildings)
+- `src/components/WorldApp.tsx`: persistent React shell, URL/altitude navigation, dialogs, GitHub UI
+- `src/world/engine.ts`: Three.js scene, camera, modular architecture, LOD, weather and construction
+- `src/world/audio.ts`: opt-in procedural ambient sound
+- `server/index.mjs`: API routes, OAuth, session and civic permission boundaries
+- `server/github.mjs`: public source snapshots, SHA verification, code/history/dependency analysis
+- `server/economy.mjs`: verified and resumable public contribution import
+- `server/store.mjs`: transactional SQLite ownership/currency/idempotency ledger and coordinates
+- `shared/`: deterministic generation and governance rules
 
-## What was kept from IsoCity
-- All rendering code (CanvasIsometricGrid, building sprites, road drawing, traffic, depth sorting)
-- Sprite sheet assets and loading system
-- Multi-canvas architecture (ground, roads, vehicles, buildings layers)
-- Water rendering, pedestrians, vehicles
+No Canvas 2D renderer or legacy IsoCity simulation remains. Never introduce spinners, simulated GitHub activity, client-authoritative currency, or cosmetic edits to code-derived geometry. Unknown data must remain visibly unknown. Preserve the MIT license. Read README.md for operating bounds, deployment requirements and cache/opt-out behavior.
 
-## What was removed
-- Economy/zoning/resource simulation
-- User building placement UI
-- Save/load, multiplayer (Supabase)
-- Toolbar, build menus, zone controls
 
-## What was added
-- GitHub API integration (fetch repo file tree)
-- Landing page with repo input
-- Hash routing (#/owner/repo)
-- Auto city generation from codebase structure
-- Build animation (buildings rise)
-- File type → building type mapping
-
-## Context
-- Domain: gitcity.co
-- See .orcha/project.md for phase breakdown
-- IsoCity reference at /tmp/isocity-ref/
+## Current city/game model
+- An owner is a city; repos are its neighborhoods. `owner_cities`/`neighborhoods` version the old map; retain legacy `cities` and contribution records.
+- Overview geometry must remain true 3D. `urban.ts` plans stable parcels and batches geometry; never restore billboard skyline sprites or tube highways.
+- Construction is tracked per repo/file and must not restart because of camera movement or refresh.
+- `CityOperations.tsx`, `shared/operations.mjs`, and `world/navigation.ts` implement local, repeat-safe service rounds. Service reputation is not GitHub contribution currency and has no server trust.
+- Mission HUD uses a portal to escape the scrolling/backdrop-filtered repo panel. Mobile gameplay must keep the scene visible.
+- `docs/city-game.md` distinguishes implemented gameplay from future cooperative simulation.

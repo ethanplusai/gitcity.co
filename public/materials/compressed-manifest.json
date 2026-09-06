@@ -1,0 +1,72 @@
+[
+  {
+    "name": "brick-color",
+    "bytes": 254115,
+    "width": 1024,
+    "height": 1024,
+    "codec": "ETC1S",
+    "srgb": true,
+    "sourceSHA256": "6a1233ec0186703de830354d89f122991e61e67fb67e0846c7eaf6c5aefea902",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  },
+  {
+    "name": "brick-normal",
+    "bytes": 1227305,
+    "width": 1024,
+    "height": 1024,
+    "codec": "UASTC",
+    "srgb": false,
+    "sourceSHA256": "8afbe3919308b168a6b7235fe7b930f670cfffa1a34de39ee790d55c9d7bda09",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  },
+  {
+    "name": "brick-rough",
+    "bytes": 162559,
+    "width": 1024,
+    "height": 1024,
+    "codec": "ETC1S",
+    "srgb": false,
+    "sourceSHA256": "a23342b02e6c5af106aaece16130aa9153a801cb1a84d5f3e0d06ce248677f38",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  },
+  {
+    "name": "concrete-color",
+    "bytes": 238711,
+    "width": 1024,
+    "height": 1024,
+    "codec": "ETC1S",
+    "srgb": true,
+    "sourceSHA256": "e129ee6b59b6ed7f65b4c4c5ba9eb583d13d040ec26bef5d5d4e0080fe342e7a",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  },
+  {
+    "name": "concrete-normal",
+    "bytes": 1310930,
+    "width": 1024,
+    "height": 1024,
+    "codec": "UASTC",
+    "srgb": false,
+    "sourceSHA256": "26c09320b3373da7f55edb8165562f16d36c07161c9c715787a09daf5910450c",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  },
+  {
+    "name": "concrete-rough",
+    "bytes": 183155,
+    "width": 1024,
+    "height": 1024,
+    "codec": "ETC1S",
+    "srgb": false,
+    "sourceSHA256": "966ee3d1a6d343e5e72d5536fde7c04ecd32e6e95efc879a102effc527f5b679",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  },
+  {
+    "name": "grass-color",
+    "bytes": 252840,
+    "width": 1024,
+    "height": 1024,
+    "codec": "ETC1S",
+    "srgb": true,
+    "sourceSHA256": "57b8041bfe0d0f01430e4dbaad45e7ddddf0a9fc97317f90dbc51f7b0d9e1b5d",
+    "encoderRevision": "99f52d63aa6799cbdaecfe977111dc5ec3b31d47"
+  }
+]
