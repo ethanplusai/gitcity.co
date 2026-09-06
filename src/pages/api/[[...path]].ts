@@ -1,10 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getApi } from '../../../server/services.mjs';
+import { requestQuery } from '../../../server/request-query.mjs';
 export const config = { api: { bodyParser: false, externalResolver: true } };
 export const maxDuration = 300;
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const api = await getApi();
+    req.query = requestQuery(req.url);
     if (req.url?.startsWith('/api/auth/')) req.url = req.url.replace('/api/auth/', '/auth/');
     await new Promise<void>((resolve) => {
       res.once('finish', resolve);
