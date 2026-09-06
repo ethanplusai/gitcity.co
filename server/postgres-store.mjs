@@ -157,9 +157,7 @@ export async function createPostgresStore(db) {
     const capacity = new Map();
     for (const row of rows)
       capacity.set(row.directory, Math.max(capacity.get(row.directory) || 0, row.slot + 1));
-    const insert = db.prepare(
-      'INSERT INTO directory_addresses(repo,path,directory,slot) VALUES(?,?,?,?)',
-    );
+    const additions = [];
     await transact(async () => {
       for (const path of active) {
         if (known.has(path)) continue;
@@ -172,9 +170,19 @@ export async function createPostgresStore(db) {
           regions.set(directory, ordinal);
         }
         const slot = capacity.get(directory) || 0;
-        insert.run(id, path, directory, slot);
+        additions.push([id, path, directory, slot]);
         known.set(path, { path, directory, slot });
         capacity.set(directory, slot + 1);
+      }
+      for (let start = 0; start < additions.length; start += 500) {
+        const batch = additions.slice(start, start + 500);
+        const tuples = batch.map(
+          (_, i) => `($${i * 4 + 1},$${i * 4 + 2},$${i * 4 + 3},$${i * 4 + 4})`,
+        );
+        await db.query(
+          `INSERT INTO directory_addresses(repo,path,directory,slot) VALUES ${tuples.join(',')}`,
+          batch.flat(),
+        );
       }
     });
     const analyzed = new Map(measurements.map((file) => [file.path, file]));
@@ -322,7 +330,7 @@ export async function createPostgresStore(db) {
       );
       for (const [index, region] of needed.entries()) {
         const claim = { ...region, ...claims[index] };
-        insert.run(owner, id, region.directory, region.chunk, claim.column, claim.row);
+        await insert.run(owner, id, region.directory, region.chunk, claim.column, claim.row);
         known.set(`${region.directory}:${region.chunk}`, claim);
       }
       const legacyMasks = new Map();

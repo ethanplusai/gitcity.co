@@ -70,6 +70,34 @@ test('PostgreSQL migrations, coordinate parity, concurrent rewards, durable auth
       (await db.prepare('SELECT soft FROM players WHERE login=?').get('production-test')).soft,
       80,
     );
+    const query = db.query;
+    db.query = async (sql, values) => {
+      if (sql.startsWith('INSERT INTO directory_addresses'))
+        throw new Error('Simulated write failure');
+      return query(sql, values);
+    };
+    await assert.rejects(
+      () => a.directoryInventory('rollback-test/city', ['src/a.ts']),
+      /Simulated write failure/,
+    );
+    db.query = query;
+    assert.equal(
+      (
+        await db
+          .prepare('SELECT COUNT(*) AS n FROM directory_regions WHERE repo=?')
+          .get('rollback-test/city')
+      ).n,
+      0,
+    );
+    const largePaths = Array.from({ length: 1200 }, (_, i) => `src/file-${i}.ts`);
+    assert.equal(
+      (await a.directoryInventory('batch-test/city', largePaths)).directories[0].count,
+      1200,
+    );
+    assert.equal(
+      (await b.directoryInventory('batch-test/city', largePaths)).directories[0].capacity,
+      1200,
+    );
     const key = randomBytes(32).toString('base64'),
       r1 = runtimeState(db, key),
       r2 = runtimeState(db, key);
