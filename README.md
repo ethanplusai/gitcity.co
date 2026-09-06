@@ -1,6 +1,16 @@
 # Gitcity
 
-A persistent, explorable 3D world built from public GitHub repositories. Next.js serves the interface; Three.js renders the world. The Canvas 2D engine, IsoCity simulation, coaster code, and sprite sheets have been removed.
+A persistent, explorable 3D world built from public GitHub repositories. Profiles and organizations become cities, repositories become neighborhoods, and source files become buildings.
+
+**[Explore Gitcity](https://gitcity.co) · [Visit the Next.js neighborhood](https://gitcity.co/vercel/next.js)** — no account required.
+
+[![An aerial view of the live Next.js neighborhood, with source buildings, roads, trees, and construction cranes](docs/images/city-overview.png)](https://gitcity.co/vercel/next.js)
+
+*Explore from above, then descend to the streets. Actual screenshots from gitcity.co, captured September 6, 2026.*
+
+[![Walking through the Next.js neighborhood at street level, with brick buildings, pedestrians, and cars](docs/images/city-streets.png)](https://gitcity.co/vercel/next.js)
+
+Built with Next.js and Three.js. Buildings are generated from parsed source code and Git history.
 
 ## Run
 
