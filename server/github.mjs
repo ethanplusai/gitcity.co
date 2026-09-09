@@ -115,6 +115,7 @@ export async function repoData(owner, repo) {
       analyzed: new Map(snapshot.analyzed),
     };
     cache.set(id, city);
+    cache.set(city.data.id.toLowerCase(), city);
     if (cache.size > MAX_CITIES) cache.delete(cache.keys().next().value);
     return city.data;
   };
@@ -174,6 +175,27 @@ async function survey(owner, repo, old) {
       if (sampled.length === 64) break;
     }
   }
+  const sources = (async () => {
+    const files = [];
+    for (let i = 0; i < sampled.length; i += 16) {
+      files.push(
+        ...(await Promise.all(
+          sampled.slice(i, i + 16).map(async (f) => {
+            try {
+              return {
+                path: f.path,
+                sha: f.sha,
+                ...analyze(f.path, await sourceAt(id, ref, f)),
+              };
+            } catch {
+              return { path: f.path, sha: f.sha, analysis: 'unavailable' };
+            }
+          }),
+        )),
+      );
+    }
+    return files;
+  })();
   const details = await Promise.all(
     commits.slice(0, 5).map((c) => github(`${base}/commits/${c.sha}`, token).catch(() => null)),
   );
@@ -208,28 +230,9 @@ async function survey(owner, repo, old) {
         }
       }),
   );
-  const files = [];
-  for (let i = 0; i < sampled.length; i += 8) {
-    files.push(
-      ...(await Promise.all(
-        sampled.slice(i, i + 8).map(async (f) => {
-          try {
-            return {
-              path: f.path,
-              sha: f.sha,
-              ...analyze(f.path, await sourceAt(id, ref, f)),
-              ...history.get(f.path),
-            };
-          } catch {
-            return { path: f.path, sha: f.sha, analysis: 'unavailable', ...history.get(f.path) };
-          }
-        }),
-      )),
-    );
-  }
+  const files = (await sources).map((file) => ({ ...file, ...history.get(file.path) }));
   let dependencies = [],
     codeowners = '';
-  const packageNames = [];
   const known = {
     react: 'facebook/react',
     next: 'vercel/next.js',
@@ -249,59 +252,13 @@ async function survey(owner, repo, old) {
   for (const manifest of manifests)
     try {
       const pkg = JSON.parse(await sourceAt(id, ref, manifest));
-      if (pkg.name && !pkg.private) packageNames.push(pkg.name);
       for (const name of Object.keys(pkg.dependencies || {})) {
         if (!dependencies.some((d) => d.name === name))
           dependencies.push({ name, repo: known[name] || null });
       }
     } catch {}
-  // Resolve a bounded set from their registry repository metadata, never guessed URLs.
-  await Promise.all(
-    dependencies
-      .filter((d) => !d.repo)
-      .slice(0, 8)
-      .map(async (dep) => {
-        try {
-          const raw = JSON.parse(
-            await boundedText(
-              `https://registry.npmjs.org/${encodeURIComponent(dep.name)}/latest`,
-              150000,
-            ),
-          );
-          const url = typeof raw.repository === 'string' ? raw.repository : raw.repository?.url;
-          const match = url?.match(/github\.com[/:]([\w.-]+\/[\w.-]+)/);
-          if (match) dep.repo = match[1].replace(/\.git$/, '');
-        } catch {}
-      }),
-  );
-  let usage = null;
-  for (const name of packageNames.slice(0, 3)) {
-    try {
-      const pkg = JSON.parse(
-        await boundedText(`https://registry.npmjs.org/${encodeURIComponent(name)}/latest`, 150000),
-      );
-      const url = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url;
-      const match = url?.match(/github\.com[/:]([\w.-]+\/[\w.-]+)/);
-      if (match?.[1].replace(/\.git$/, '').toLowerCase() !== id.toLowerCase()) continue;
-      const downloads = JSON.parse(
-        await boundedText(
-          `https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(name)}`,
-          20000,
-        ),
-      );
-      if (Number.isFinite(downloads.downloads)) {
-        usage = {
-          kind: 'npm downloads',
-          package: name,
-          weekly: downloads.downloads,
-          end: downloads.end,
-        };
-        break;
-      }
-    } catch {
-      /* Unsupported registries remain unknown. */
-    }
-  }
+  // Registry traffic is not required to construct source buildings.
+  const usage = null;
   const owners = ['.github/CODEOWNERS', 'CODEOWNERS', 'docs/CODEOWNERS']
     .map((p) => all.find((f) => f.path === p))
     .find(Boolean);
@@ -309,15 +266,8 @@ async function survey(owner, repo, old) {
     try {
       codeowners = await sourceAt(id, ref, owners);
     } catch {}
-  const headers = await Promise.all(
-    commits
-      .slice(0, 8)
-      .map((c) =>
-        boundedText(`https://github.com/${id}/commit/${c.sha}.patch`, 12000, true).catch(
-          () => null,
-        ),
-      ),
-  );
+  // Lighting follows the visitor clock; no per-commit patch downloads are needed.
+  const headers = [];
   const checksState = checks?.check_runs?.length
     ? checks.check_runs.some((c) =>
         ['failure', 'timed_out', 'action_required'].includes(c.conclusion),
@@ -384,7 +334,9 @@ async function survey(owner, repo, old) {
     [...(old?.analyzed || [])].filter(([path, file]) => hashes.get(path) === file.sha),
   );
   for (const file of files) analyzed.set(file.path, file);
-  cache.set(id.toLowerCase(), { data, all, ref, history, analyzed, expires: Date.now() + 60000 });
+  const snapshot = { data, all, ref, history, analyzed, expires: Date.now() + 60000 };
+  cache.set(id.toLowerCase(), snapshot);
+  cache.set(data.id.toLowerCase(), snapshot);
   if (cache.size > MAX_CITIES) cache.delete(cache.keys().next().value);
   return data;
 }

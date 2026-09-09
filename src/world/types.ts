@@ -1,4 +1,7 @@
 export type City = {
+  stars?: number;
+  archived?: boolean;
+  fork?: boolean;
   cached?: boolean;
   city?: { owner: string; x: number; z: number };
   id: string;

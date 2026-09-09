@@ -2,6 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { progressiveCities } from '../shared/progressive-cities.mjs';
 
+test('offscreen neighborhoods wait until exploration brings them into range', async () => {
+  const controller = new AbortController();
+  const published = [];
+  let visible = 0;
+  const task = progressiveCities([0, 1, 2], {
+    signal: controller.signal,
+    eligible: (id) => id <= visible,
+    load: async (id) => id,
+    publish: async (id) => {
+      published.push(id);
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.deepEqual(published, [0]);
+  visible = 1;
+  await new Promise((resolve) => setTimeout(resolve, 330));
+  assert.deepEqual(published, [0, 1]);
+  controller.abort();
+  await task;
+  assert.deepEqual(published, [0, 1]);
+});
+
 test('a slow first repo does not hold up its neighbors or limit the city to four repos', async () => {
   let release;
   const gate = new Promise((resolve) => (release = resolve));

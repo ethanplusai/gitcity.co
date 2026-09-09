@@ -4,6 +4,7 @@ import VerifyContribution from './VerifyContribution';
 import { mergeSourceFiles } from '../../shared/source-pages.mjs';
 import { reconcileSourceFiles } from '../../shared/source-reconcile.mjs';
 import { progressiveCities } from '../../shared/progressive-cities.mjs';
+import { cityArrivalOrder } from '../../shared/city-arrival.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -345,7 +346,7 @@ export default function WorldApp() {
       api<City[]>(`/api/owners/${encodeURIComponent(r.owner!)}`, { signal: controller.signal })
         .then((data) => {
           if (controller.signal.aborted) return;
-          const cities = data.map((c) => ({ ...c, color: '#b4ce9e' }));
+          const cities = cityArrivalOrder(data.map((c) => ({ ...c, color: '#b4ce9e' })));
           setOwnerCities(cities);
           engine.current?.ownerView(
             cities,
@@ -353,10 +354,42 @@ export default function WorldApp() {
             engine.current?.navigationRevision !== arrivalRevision,
           );
           setPhase(`Constructing neighborhoods · 0 of ${cities.length}`);
+          let framed = false;
+          let entranceFailed = false;
+          let fallback: Repo | null = null;
           void progressiveCities(cities, {
             signal: controller.signal,
+            eligible: (city: City) =>
+              city === cities[0] || Boolean(engine.current?.shouldBuildCity(city)),
+            onFailure: (city: City, error: Error & { status?: number }) => {
+              if (controller.signal.aborted) return;
+              if (city === cities[0]) {
+                entranceFailed = true;
+                if (!framed && fallback) {
+                  framed = true;
+                  if (engine.current?.navigationRevision === arrivalRevision)
+                    engine.current?.focusNeighborhood(fallback.id);
+                  setArriving(false);
+                }
+              }
+              if ([404, 410].includes(error.status || 0)) {
+                engine.current?.removeCity(city.id);
+                setOwnerCities((previous) => previous.filter((c) => c.id !== city.id));
+              }
+              setNotice(`${city.id}: ${error.message}`);
+            },
             load: (city: City) => api<Repo>(`/api/repos/${city.id}`, { signal: controller.signal }),
-            publish: (data: Repo) => engine.current?.previewBatch([data], controller.signal),
+            publish: async (data: Repo, city: City) => {
+              await engine.current?.previewBatch([data], controller.signal);
+              if (controller.signal.aborted) return;
+              if (data.files.length) fallback ||= data;
+              if (!framed && data.files.length && (city === cities[0] || entranceFailed)) {
+                framed = true;
+                if (engine.current?.navigationRevision === arrivalRevision)
+                  engine.current?.focusNeighborhood(data.id);
+                setArriving(false);
+              }
+            },
             progress: (completed: number, total: number, failed: number) =>
               setPhase(
                 `Constructing neighborhoods · ${completed - failed} of ${total}${failed ? ` · ${failed} unavailable` : ''}`,
@@ -1080,6 +1113,14 @@ export default function WorldApp() {
               Cached neighborhoods only. The full city directory will return when GitHub’s API is
               available.
             </p>
+          )}
+          {isOwner && ownerCities.length > 0 && (
+            <button
+              className="primary wide"
+              onClick={() => engine.current?.ownerView(ownerCities, false, false, true)}
+            >
+              <Globe2 size={17} /> View the whole city
+            </button>
           )}
           {error && (
             <div className="error-panel" role="alert">

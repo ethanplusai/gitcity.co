@@ -8,6 +8,17 @@ import { plannedLayout } from '../src/world/planned-layout.ts';
 import { ownerPlan } from '../src/world/owner-plan.ts';
 import { directoryMassing, directoryHit } from '../src/world/directory-massing.ts';
 
+test('aerial arrivals frame a populated cluster instead of the first isolated file', () => {
+  const parcels = [
+    { x: -1000, z: -1000 },
+    ...Array.from({ length: 12 }, (_, i) => ({ x: (i % 4) * 5, z: Math.floor(i / 4) * 5 })),
+  ];
+  const arrival = repoArrival({ parcels, regions: [], civic: { x: 0, z: 0 }, total: 10000 });
+  assert.ok(arrival.center.x >= 0 && arrival.center.x <= 15);
+  assert.ok(arrival.center.z >= 0 && arrival.center.z <= 10);
+  assert.ok(arrival.span < 40);
+});
+
 function fixture(store, id) {
   const paths = Array.from({ length: 130 }, (_, i) => `src/${String(i).padStart(3, '0')}.ts`);
   const files = [{ path: paths[0], symbols: 3, lines: 20, analysis: 'AST' }];

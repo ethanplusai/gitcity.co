@@ -717,6 +717,7 @@ export class WorldEngine {
     }
     const plan = data.landPlan ? preparedLayout || plannedLayout(data, addresses) : null;
     const layout = plan || parcels(data, addresses);
+    entry.group.userData.labelOffset = plan ? repoArrival(plan).center : { x: 0, z: 0 };
     const freshPreview =
       !this.reduceMotion &&
       !preparedFacades &&
@@ -803,8 +804,7 @@ export class WorldEngine {
           .then((prepared) => {
             if (!prepared) return;
             try {
-              if (!canceled() && !this.pendingPreviewBatches)
-                this.preview(data, false, plan || undefined, !detail, prepared);
+              if (!canceled()) this.preview(data, false, plan || undefined, !detail, prepared);
             } finally {
               if (!prepared.parent) disposePreviewFacades(prepared);
             }
@@ -1221,6 +1221,7 @@ export class WorldEngine {
     for (const { group } of this.cities.values()) group.visible = true;
   }
   enter(data: Repo, file?: string, preserveCamera = false) {
+    const previousActive = this.active;
     this.viewMode = 'repo';
     const arrival = this.pendingStreetView?.id === data.id ? this.pendingStreetView : null;
     this.pendingStreetView = null;
@@ -1235,6 +1236,16 @@ export class WorldEngine {
     this.clearDistrict();
     this.data = data;
     this.active = data.id;
+    if (!this.cities.has(data.id)) {
+      const provisional = this.cities.get(previousActive || '')?.city;
+      this.addCity({
+        ...(provisional || data.coordinates || coordinates(data.id)),
+        id: data.id,
+        name: data.name,
+        language: data.language,
+        color: '#b4ce9e',
+      });
+    }
     const located = this.cities.get(data.id);
     if (located && data.coordinates) {
       // A cold link begins at a seeded address. Keep any visitor camera movement
@@ -1272,6 +1283,9 @@ export class WorldEngine {
     }
     const plan = data.landPlan ? plannedLayout(data, addresses) : null;
     const layout = plan || parcels(data, addresses);
+    this.cities.get(data.id)!.group.userData.labelOffset = plan
+      ? repoArrival(plan).center
+      : { x: 0, z: 0 };
     this.activePlan = plan;
     this.clearCityTrees();
     const dirs = layout.dirs;
@@ -2252,7 +2266,39 @@ export class WorldEngine {
     );
     this.finishArrival();
   }
-  ownerView(cities: City[], immediate = false, preserveCamera = false) {
+  private ownerFocusOffset = new T.Vector2();
+  private ownerEntrance: string | null = null;
+  focusNeighborhood(id: string) {
+    const entry = this.cities.get(id);
+    if (!entry) return;
+    this.ownerEntrance = id;
+    const plan = entry.group.getObjectByName('neighborhood')?.userData.previewLayout as
+      PlannedLayout | undefined;
+    const arrival = plan ? repoArrival(plan) : { center: { x: 0, z: 0 }, span: 42 };
+    this.ownerFocusOffset.set(arrival.center.x, arrival.center.z);
+    const center = new T.Vector3(
+      entry.city.x + arrival.center.x,
+      0,
+      entry.city.z + arrival.center.z,
+    );
+    this.fly(
+      center
+        .clone()
+        .add(new T.Vector3(arrival.span * 0.6, arrival.span * 0.65, arrival.span * 0.8)),
+      center,
+    );
+    this.finishArrival();
+  }
+  shouldBuildCity(city: City) {
+    const radius = Math.max(100, this.camera.position.y * 1.5);
+    return (
+      Math.hypot(
+        city.x - this.controls.target.x + this.ownerFocusOffset.x,
+        city.z - this.controls.target.z + this.ownerFocusOffset.y,
+      ) < radius
+    );
+  }
+  ownerView(cities: City[], immediate = false, preserveCamera = false, wholeCity = false) {
     this.viewMode = 'owner';
     this.cancelJob();
     if (this.data) {
@@ -2264,6 +2310,11 @@ export class WorldEngine {
     cities.forEach((c) => this.addCity(c, false));
     this.clearCityTrees();
     if (!cities.length) return;
+    if (!wholeCity) {
+      if (!preserveCamera) this.focusNeighborhood(cities[0].id);
+      return;
+    }
+    this.ownerFocusOffset.set(0, 0);
     const known = this.ownerGround.get(cities[0].id.split('/')[0].toLowerCase());
     const points = known
       ? [
@@ -2829,6 +2880,14 @@ export class WorldEngine {
       const city = this.cities.get(id)!.city;
       const survey =
         this.data?.id !== id && Boolean(this.cities.get(id)?.group.getObjectByName('arrival-grid'));
+      const distantSurvey =
+        survey && this.camera.position.distanceTo(new T.Vector3(city.x, 0, city.z)) > 180;
+      // Placeholder addresses are not land claims: displaying every survey pad
+      // can overlap another neighborhood's real, permanently allocated blocks.
+      const hiddenSurvey =
+        distantSurvey || (survey && id !== this.active && id !== this.ownerEntrance);
+      const surveyGround = this.cities.get(id)?.group.getObjectByName('arrival-grid');
+      if (surveyGround) surveyGround.visible = !hiddenSurvey;
       el.classList.toggle('survey-label', survey);
       const worldLabel = this.viewMode === 'world' && this.camera.position.y > 120;
       const title = worldLabel ? id.split('/')[0] : city.name;
@@ -2841,7 +2900,8 @@ export class WorldEngine {
         sub = el.querySelector('small')!;
       if (name.textContent !== title) name.textContent = title;
       if (sub.textContent !== subtitle) sub.textContent = subtitle;
-      const p = new T.Vector3(city.x, 10, city.z).project(this.camera);
+      const offset = this.cities.get(id)?.group.userData.labelOffset || { x: 0, z: 0 };
+      const p = new T.Vector3(city.x + offset.x, 10, city.z + offset.z).project(this.camera);
       const screenX = (p.x * 0.5 + 0.5) * width;
       const screenY = (-p.y * 0.5 + 0.5) * height;
       const owner = id.split('/')[0];
@@ -2852,6 +2912,7 @@ export class WorldEngine {
         );
       el.style.transform = `translate(-50%,-50%) translate(${screenX}px,${screenY}px)`;
       el.style.display =
+        hiddenSurvey ||
         crowded ||
         p.z > 1 ||
         p.z < 0 ||

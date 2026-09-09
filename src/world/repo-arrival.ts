@@ -3,15 +3,24 @@ import type { PlannedLayout } from './planned-layout.ts';
 // Repository links arrive at a legible neighborhood. The complete inventory
 // determines the city footprint, but must not push visitors kilometers away.
 export function repoArrival(plan: PlannedLayout) {
-  const entrance = plan.parcels[0]?.front || plan.regions[0]?.center || plan.civic;
-  const nearby = plan.parcels.filter((p) => Math.hypot(p.x - entrance.x, p.z - entrance.z) < 35);
+  let nearby: typeof plan.parcels = [];
+  const stride = Math.max(1, Math.ceil(plan.parcels.length / 64));
+  for (let i = 0; i < plan.parcels.length; i += stride) {
+    const candidate = plan.parcels[i];
+    const cluster = plan.parcels.filter(
+      (p) => Math.hypot(p.x - candidate.x, p.z - candidate.z) < 28,
+    );
+    if (cluster.length > nearby.length) nearby = cluster;
+  }
+  const entrance = plan.regions[0]?.center || plan.civic;
   const center = nearby.length
     ? {
         x: nearby.reduce((sum, p) => sum + p.x, 0) / nearby.length,
         z: nearby.reduce((sum, p) => sum + p.z, 0) / nearby.length,
       }
     : entrance;
-  return { center, span: Math.min(64, Math.max(28, plan.total)) };
+  const radius = Math.max(12, ...nearby.map((p) => Math.hypot(p.x - center.x, p.z - center.z)));
+  return { center, span: Math.min(64, Math.max(28, radius * 2 + 8)) };
 }
 
 // Choose a real frontage with a populated view along its street. Fixed parcel
