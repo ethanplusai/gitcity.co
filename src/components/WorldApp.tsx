@@ -995,6 +995,18 @@ export default function WorldApp() {
             <ArrowUpRight size={13} />
           </button>
         </nav>
+        <div className="project-links">
+          <a
+            href="https://github.com/ethanplusai/gitcity.co"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Github size={15} /> GitHub
+          </a>
+          <a href="https://x.com/ethanplusai" target="_blank" rel="noopener noreferrer">
+            Created by Ethan <ArrowUpRight size={13} />
+          </a>
+        </div>
         <div className="header-actions">
           <button
             className="search-trigger"

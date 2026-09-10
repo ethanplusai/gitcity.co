@@ -2237,7 +2237,18 @@ export class WorldEngine {
     this.walking = false;
     this.active = null;
     this.controls.minDistance = 1.8;
-    const entry = this.cities.get('vercel/next.js');
+    // Returning from a shared link may precede the homepage snapshot. Keep a
+    // real, already constructed neighborhood in view until that snapshot lands.
+    const featured = this.cities.get('vercel/next.js');
+    const entry = featured?.group.getObjectByName('neighborhood')
+      ? featured
+      : [...this.cities.values()]
+          .filter((c) => c.group.getObjectByName('neighborhood'))
+          .sort(
+            (a, b) =>
+              a.group.position.distanceToSquared(this.camera.position) -
+              b.group.position.distanceToSquared(this.camera.position),
+          )[0] || featured;
     const home = entry?.city || ownerSeed('vercel');
     const neighborhood = entry?.group.getObjectByName('neighborhood');
     const layout = neighborhood?.userData.previewLayout as PlannedLayout | undefined;
@@ -2280,6 +2291,9 @@ export class WorldEngine {
     if (entranceChanged) this.clearCityTrees();
     const plan = entry.group.getObjectByName('neighborhood')?.userData.previewLayout as
       PlannedLayout | undefined;
+    // A directory response only identifies addresses. Do not abandon visible
+    // buildings for an empty address while the destination source is loading.
+    if (!entry.group.getObjectByName('neighborhood') && this.previews.size) return;
     const arrival = plan ? repoArrival(plan) : { center: { x: 0, z: 0 }, span: 42 };
     this.ownerFocusOffset.set(arrival.center.x, arrival.center.z);
     const center = new T.Vector3(

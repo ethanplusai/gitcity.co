@@ -214,6 +214,35 @@ kbd {
   gap: 24px;
   align-items: center;
 }
+.project-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  white-space: nowrap;
+}
+.project-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.project-links a:hover {
+  color: var(--ink);
+}
+@media (min-width: 701px) and (max-width: 1200px) {
+  .topbar {
+    gap: 20px;
+    padding-inline: 24px;
+  }
+  .topbar nav {
+    gap: 16px;
+  }
+  .project-links {
+    gap: 12px;
+  }
+}
 .search-trigger {
   font-size: 12px;
   color: #b8c1bc;
@@ -1472,6 +1501,18 @@ dialog::backdrop {
   }
   .topbar nav {
     display: none;
+  }
+  .topbar {
+    height: 96px;
+    flex-wrap: wrap;
+    align-content: center;
+    column-gap: 10px;
+    row-gap: 8px;
+  }
+  .project-links {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: space-between;
   }
   .header-actions {
     gap: 17px;
