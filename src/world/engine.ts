@@ -756,7 +756,8 @@ export class WorldEngine {
         this.disposeGroup(batch);
       }
     }
-    if (plan) real.add(directoryMassing(plan.regions));
+    // Organization previews show analyzed buildings, not thousands of empty
+    // survey slabs. Reserved addresses remain available inside the repository.
     this.disposeGroup(source);
     if (!plan) real.add(streetscape(layout.total, layout.side), publicRealm(layout.total, data.id));
     real.scale.setScalar(plan ? 1 : ((entry.city.footprint || 14) * 1.7) / layout.total);
