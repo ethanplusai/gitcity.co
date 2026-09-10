@@ -45,9 +45,15 @@ export async function createPostgresStore(db) {
       .run(id, owner, slot, position.x, position.z);
     return position;
   }
-  await db.transaction(async () => {
-    for (const city of atlas) await locate(city.id);
-  });
+  // Ordinary cold starts are read-only. They must not queue session/health
+  // requests behind another visitor's city allocation transaction.
+  const seeded = await db
+    .prepare(`SELECT id FROM neighborhoods WHERE id IN (${atlas.map(() => '?').join(',')})`)
+    .all(...atlas.map((city) => city.id));
+  if (seeded.length !== atlas.length)
+    await db.transaction(async () => {
+      for (const city of atlas) await locate(city.id);
+    });
   async function transact(fn) {
     return db.transaction(fn);
   }

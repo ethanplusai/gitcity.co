@@ -25,19 +25,31 @@ export function postgresDatabase(pool) {
   const transaction = async (fn) => {
     if (context.getStore()) return fn();
     const client = await pool.connect();
+    let connectionError;
+    const disconnected = (error) => {
+      connectionError = error;
+    };
+    client.on?.('error', disconnected);
     try {
       await client.query('BEGIN');
+      // Serverless requests can be suspended after a visitor navigates away.
+      // Enforce these on PostgreSQL itself, including through the pooler.
+      await client.query("SET LOCAL idle_in_transaction_session_timeout = '15s'");
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      await client.query("SET LOCAL statement_timeout = '20s'");
       // Allocation and ledger writes are short; serialize them across instances.
       // No GitHub/network work belongs inside this transaction.
       await client.query('SELECT pg_advisory_xact_lock(72451901)');
       const result = await context.run(client, fn);
+      if (connectionError) throw connectionError;
       await client.query('COMMIT');
       return result;
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
-      client.release();
+      client.removeListener?.('error', disconnected);
+      client.release(connectionError);
     }
   };
   return {
@@ -59,16 +71,18 @@ export function connectPostgres(url = process.env.DATABASE_URL || process.env.PO
   const connection = new URL(url);
   if (['prefer', 'require', 'verify-ca'].includes(connection.searchParams.get('sslmode')))
     connection.searchParams.set('sslmode', 'verify-full');
-  return postgresDatabase(
-    new pg.Pool({
-      connectionString: connection.toString(),
-      max: 4,
-      idleTimeoutMillis: 20000,
-      connectionTimeoutMillis: 10000,
-      statement_timeout: 20000,
-      allowExitOnIdle: true,
-    }),
+  const pool = new pg.Pool({
+    connectionString: connection.toString(),
+    max: 4,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 10000,
+    statement_timeout: 20000,
+    allowExitOnIdle: true,
+  });
+  pool.on('error', (error) =>
+    console.error('Idle database connection closed', { code: error.code || 'connection_error' }),
   );
+  return postgresDatabase(pool);
 }
 export async function migrate(db) {
   await db.transaction(async () => {

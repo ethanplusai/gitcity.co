@@ -19,6 +19,19 @@ test('PostgreSQL migrations, coordinate parity, concurrent rewards, durable auth
     await assert.rejects(() => importWorld(local.db, db), /empty destination/);
     const a = await createPostgresStore(db),
       b = await createPostgresStore(db);
+    await createPostgresStore({
+      ...db,
+      transaction: () => {
+        throw new Error('An already seeded cold start must not acquire the allocation lock');
+      },
+    });
+    const limits = await db.transaction(async () => ({
+      idle: (await db.query('SHOW idle_in_transaction_session_timeout')).rows[0]
+        .idle_in_transaction_session_timeout,
+      lock: (await db.query('SHOW lock_timeout')).rows[0].lock_timeout,
+      statement: (await db.query('SHOW statement_timeout')).rows[0].statement_timeout,
+    }));
+    assert.deepEqual(limits, { idle: '15s', lock: '5s', statement: '20s' });
     const name = 'production-test/city';
     assert.deepEqual(await a.locate(name), local.locate(name));
     const [first, second] = await Promise.all([
