@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/next';
 import WorldApp from '@/components/WorldApp';
 import './globals.css';
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <WorldApp />
         {children}
+        <Analytics />
       </body>
     </html>
   );
