@@ -1,6 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ownerDirectoryCache } from '../server/owner-directory.mjs';
+import { ownerDirectoryCache, ownerDirectoryPage } from '../server/owner-directory.mjs';
+
+test('a directory page can be returned without reading the remaining organization', async () => {
+  const calls = [];
+  const page = await ownerDirectoryPage('large-org', async (path) => {
+    calls.push(path);
+    return Array.from({ length: 100 }, (_, index) => ({
+      full_name: `large-org/repo-${index}`,
+      private: index === 0,
+    }));
+  });
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].endsWith('page=1'));
+  assert.equal(page.repos.length, 99);
+  assert.equal(page.nextPage, 2);
+  await assert.rejects(
+    ownerDirectoryPage(
+      'large-org',
+      () => {
+        throw Error('must not fetch');
+      },
+      -1,
+    ),
+    /Invalid directory page/,
+  );
+});
 test('owner directory paginates, coalesces visitors, filters exclusions and retries failures', async () => {
   const cached = ownerDirectoryCache();
   let calls = 0;

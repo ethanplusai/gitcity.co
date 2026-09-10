@@ -1,5 +1,16 @@
 // Cache public directory metadata, not expensive source analysis. Concurrent
 // visitors share one paginated request; rejected requests can be retried.
+export async function ownerDirectoryPage(owner, load, page = 1) {
+  if (!Number.isInteger(page) || page < 1 || page > 1000)
+    throw Object.assign(new Error('Invalid directory page.'), { status: 400 });
+  const batch = await load(
+    `/users/${encodeURIComponent(owner)}/repos?sort=pushed&per_page=100&page=${page}`,
+  );
+  return {
+    repos: batch.filter((repo) => !repo.private && !repo.topics?.includes('gitcity-opt-out')),
+    nextPage: batch.length === 100 ? page + 1 : null,
+  };
+}
 export function ownerDirectoryCache(ttl = 900000, limit = 32) {
   const entries = new Map();
   return async (owner, load) => {

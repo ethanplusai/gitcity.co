@@ -372,7 +372,10 @@ export class WorldEngine {
       }
     }
     for (const { city, group } of this.cities.values()) {
-      if (group.getObjectByName('arrival-grid')) {
+      if (
+        group.getObjectByName('arrival-grid') &&
+        (city.id === this.active || city.id === this.ownerEntrance)
+      ) {
         blocks.push([
           { x: city.x - 12, z: city.z - 12 },
           { x: city.x + 12, z: city.z - 12 },
@@ -2271,7 +2274,9 @@ export class WorldEngine {
   focusNeighborhood(id: string) {
     const entry = this.cities.get(id);
     if (!entry) return;
+    const entranceChanged = this.ownerEntrance !== id;
     this.ownerEntrance = id;
+    if (entranceChanged) this.clearCityTrees();
     const plan = entry.group.getObjectByName('neighborhood')?.userData.previewLayout as
       PlannedLayout | undefined;
     const arrival = plan ? repoArrival(plan) : { center: { x: 0, z: 0 }, span: 42 };
@@ -2307,7 +2312,11 @@ export class WorldEngine {
       this.data = null;
     }
     this.active = null;
-    cities.forEach((c) => this.addCity(c, false));
+    // A directory entry is cheap data, not thousands of meshes and DOM labels.
+    // Source previews materialize their own scene entries when explored.
+    cities.forEach((c, index) => {
+      if (index === 0 || this.cities.has(c.id)) this.addCity(c, false);
+    });
     this.clearCityTrees();
     if (!cities.length) return;
     if (!wholeCity) {

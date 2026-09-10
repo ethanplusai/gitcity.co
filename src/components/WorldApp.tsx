@@ -44,6 +44,8 @@ type Player = {
   possessions: { repo: string; item: string }[];
 };
 type Modal = 'highway' | 'search' | 'about' | 'passport' | 'hall' | 'file' | null;
+type CityDirectory = City[] | { cities: City[]; nextPage: number | null };
+const directoryCities = (data: CityDirectory) => (Array.isArray(data) ? data : data.cities);
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const r = await fetch(path, options);
   const data = await r.json();
@@ -78,6 +80,7 @@ export default function WorldApp() {
     [route, setRoute] = useState('/'),
     [repo, setRepo] = useState<Repo | null>(null),
     [ownerCities, setOwnerCities] = useState<City[]>([]),
+    [ownerListLimit, setOwnerListLimit] = useState(60),
     [nearbyCities, setNearbyCities] = useState<City[]>([]),
     [phase, setPhase] = useState('The world is taking shape'),
     [error, setError] = useState(''),
@@ -342,12 +345,19 @@ export default function WorldApp() {
       repoRef.current = null;
       setArriving(true);
       setOwnerCities([]);
+      setOwnerListLimit(60);
       setPhase('Surveying this city’s districts');
-      api<City[]>(`/api/owners/${encodeURIComponent(r.owner!)}`, { signal: controller.signal })
+      api<CityDirectory>(`/api/owners/${encodeURIComponent(r.owner!)}?page=1`, {
+        signal: controller.signal,
+      })
         .then((data) => {
           if (controller.signal.aborted) return;
-          const cities = cityArrivalOrder(data.map((c) => ({ ...c, color: '#b4ce9e' })));
-          setOwnerCities(cities);
+          const cities = cityArrivalOrder(
+            directoryCities(data).map((c) => ({ ...c, color: '#b4ce9e' })),
+          );
+          let directoryComplete = Array.isArray(data) || !data.nextPage;
+          const unavailable = new Set<string>();
+          setOwnerCities([...cities]);
           engine.current?.ownerView(
             cities,
             false,
@@ -357,8 +367,45 @@ export default function WorldApp() {
           let framed = false;
           let entranceFailed = false;
           let fallback: Repo | null = null;
+          // Start drawing the first page immediately. Even organizations with
+          // thousands of repositories need only one directory request to arrive.
+          void (async () => {
+            let nextPage = Array.isArray(data) ? null : data.nextPage;
+            const seen = new Set(cities.map((city) => city.id.toLowerCase()));
+            try {
+              while (nextPage && !controller.signal.aborted) {
+                const page = await api<CityDirectory>(
+                  `/api/owners/${encodeURIComponent(r.owner!)}?page=${nextPage}`,
+                  { signal: controller.signal },
+                );
+                if (controller.signal.aborted) return;
+                const wasEmpty = cities.length === 0;
+                for (const city of cityArrivalOrder(directoryCities(page))) {
+                  if (seen.has(city.id.toLowerCase())) continue;
+                  seen.add(city.id.toLowerCase());
+                  cities.push({ ...city, color: '#b4ce9e' });
+                }
+                const visible = cities.filter((city) => !unavailable.has(city.id));
+                setOwnerCities([...visible]);
+                engine.current?.ownerView(
+                  visible,
+                  false,
+                  !wasEmpty || engine.current?.navigationRevision !== arrivalRevision,
+                );
+                nextPage = Array.isArray(page) ? null : page.nextPage;
+              }
+            } catch (error) {
+              if (!controller.signal.aborted)
+                setError(
+                  `The remaining directory could not be reached. ${(error as Error).message}`,
+                );
+            } finally {
+              directoryComplete = true;
+            }
+          })();
           void progressiveCities(cities, {
             signal: controller.signal,
+            directoryComplete: () => directoryComplete,
             eligible: (city: City) =>
               city === cities[0] || Boolean(engine.current?.shouldBuildCity(city)),
             onFailure: (city: City, error: Error & { status?: number }) => {
@@ -373,6 +420,7 @@ export default function WorldApp() {
                 }
               }
               if ([404, 410].includes(error.status || 0)) {
+                unavailable.add(city.id);
                 engine.current?.removeCity(city.id);
                 setOwnerCities((previous) => previous.filter((c) => c.id !== city.id));
               }
@@ -392,7 +440,7 @@ export default function WorldApp() {
             },
             progress: (completed: number, total: number, failed: number) =>
               setPhase(
-                `Constructing neighborhoods · ${completed - failed} of ${total}${failed ? ` · ${failed} unavailable` : ''}`,
+                `Constructing neighborhoods · ${completed - failed} of ${total}${directoryComplete ? '' : '+'}${failed ? ` · ${failed} unavailable` : ''}`,
               ),
           }).then((failures) => {
             if (controller.signal.aborted) return;
@@ -483,8 +531,11 @@ export default function WorldApp() {
     const controller = new AbortController(),
       owner = activeRepoId.split('/')[0];
     // A shared link opens its own district first; adjoining neighborhoods materialize behind it.
-    api<City[]>(`/api/owners/${encodeURIComponent(owner)}`, { signal: controller.signal })
-      .then(async (cities) => {
+    api<CityDirectory>(`/api/owners/${encodeURIComponent(owner)}?page=1`, {
+      signal: controller.signal,
+    })
+      .then(async (directory) => {
+        const cities = cityArrivalOrder(directoryCities(directory));
         const neighbors = cities.filter((c) => c.id !== activeRepoId).slice(0, 2);
         const loaded = await Promise.allSettled(
           neighbors.map(async (city) => {
@@ -1138,7 +1189,7 @@ export default function WorldApp() {
           )}
           {isOwner ? (
             <div className="owner-list">
-              {ownerCities.map((c) => (
+              {ownerCities.slice(0, ownerListLimit).map((c) => (
                 <button key={c.id} onClick={() => navigate('/' + c.id)}>
                   <Layers3 size={15} />
                   <span>
@@ -1148,6 +1199,12 @@ export default function WorldApp() {
                   <ArrowUpRight size={14} />
                 </button>
               ))}
+              {ownerCities.length > ownerListLimit && (
+                <button onClick={() => setOwnerListLimit((limit) => limit + 60)}>
+                  Show more neighborhoods ({ownerCities.length - ownerListLimit} more)
+                  <ArrowDown size={15} />
+                </button>
+              )}
             </div>
           ) : !error && repo ? (
             <>

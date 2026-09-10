@@ -2,6 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { progressiveCities } from '../shared/progressive-cities.mjs';
 
+test('construction begins before the directory finishes and consumes subsequent pages', async () => {
+  const cities = [0];
+  const published = [];
+  let complete = false;
+  const task = progressiveCities(cities, {
+    signal: new AbortController().signal,
+    directoryComplete: () => complete,
+    load: async (id) => id,
+    publish: async (id) => {
+      published.push(id);
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.deepEqual(published, [0]);
+  cities.push(1, 2, 3);
+  complete = true;
+  await task;
+  assert.deepEqual(published, [0, 1, 2, 3]);
+});
+
 test('offscreen neighborhoods wait until exploration brings them into range', async () => {
   const controller = new AbortController();
   const published = [];

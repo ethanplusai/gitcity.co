@@ -1,4 +1,4 @@
-import { ownerDirectoryCache } from './owner-directory.mjs';
+import { ownerDirectoryCache, ownerDirectoryPage } from './owner-directory.mjs';
 import { sourceLayout } from './source-layout-async.mjs';
 import express from 'express';
 import { publicSnapshotAllowed, cachedRepository, cachedSource } from './cached-world.mjs';
@@ -239,27 +239,44 @@ export function createApi({
   app.get('/api/owners/:owner', async (req, res, next) => {
     try {
       validateRepo(req.params.owner, 'repo');
-      const repos = await runtime.cached('owner:' + req.params.owner.toLowerCase(), 900000, () =>
-        ownerDirectory(req.params.owner, (path) => github(path, process.env.GITHUB_TOKEN)),
-      );
+      const page = req.query.page === undefined ? null : Number(req.query.page);
+      if (page !== null && (!Number.isInteger(page) || page < 1 || page > 1000))
+        return res.status(400).json({ error: 'Invalid directory page.' });
+      const directory =
+        page === null
+          ? null
+          : await runtime.cached(
+              `owner-page:v1:${req.params.owner.toLowerCase()}:${page}`,
+              900000,
+              () =>
+                ownerDirectoryPage(
+                  req.params.owner,
+                  (path) => github(path, process.env.GITHUB_TOKEN),
+                  page,
+                ),
+            );
+      const repos =
+        directory?.repos ||
+        (await runtime.cached('owner:' + req.params.owner.toLowerCase(), 900000, () =>
+          ownerDirectory(req.params.owner, (path) => github(path, process.env.GITHUB_TOKEN)),
+        ));
       res.setHeader('Cache-Control', 'public, max-age=60');
-      res.json(
-        await Promise.all(
-          repos
-            .filter((r) => !r.private && !r.topics?.includes('gitcity-opt-out'))
-            .map(async (r) => ({
-              id: r.full_name,
-              name: r.name,
-              language: r.language,
-              stars: r.stargazers_count,
-              archived: r.archived,
-              fork: r.fork,
-              description: r.description,
-              ...(await store.locate(r.full_name)),
-              city: { owner: r.owner.login, ...(await store.locateOwner(r.owner.login)) },
-            })),
-        ),
+      const cities = await Promise.all(
+        repos
+          .filter((r) => !r.private && !r.topics?.includes('gitcity-opt-out'))
+          .map(async (r) => ({
+            id: r.full_name,
+            name: r.name,
+            language: r.language,
+            stars: r.stargazers_count,
+            archived: r.archived,
+            fork: r.fork,
+            description: r.description,
+            ...(await store.locate(r.full_name)),
+            city: { owner: r.owner.login, ...(await store.locateOwner(r.owner.login)) },
+          })),
       );
+      res.json(page === null ? cities : { cities, nextPage: directory.nextPage });
     } catch (e) {
       if ([403, 429].includes(e.status)) {
         const snapshots = JSON.parse(
